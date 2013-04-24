@@ -1,0 +1,235 @@
+#include "slave.h"
+#include <sstream>
+#include <unistd.h>
+#include <signal.h>
+#include <stdio.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <stdlib.h>
+
+using namespace std;
+
+int n = 0;
+Slave::Slave()
+{
+}
+Slave::~Slave()
+{
+}
+
+int Slave::init()
+{
+	inCmdPort = 53001;
+	outCmdPort = 53000;
+	if(!cr.getMasterAddress("./mantouDB/mantouDB/masterlist", masterAddress))
+		return 0;
+	ClientSocket c(masterAddress, outCmdPort);
+	m_client = c;
+	localAddress = cr.GetLocalIP();
+	string report = localAddress + " is started!";
+	cout << localAddress << " clisock" <<m_client.m_sock<<endl;
+	cout << "init connect success" << endl;
+	try
+	{
+		m_client << report;
+		string s,s1;
+	}
+
+	catch(SocketException& e)
+	{
+		cout << "error:" << e.description() << endl;
+	}
+	
+	m_Status = RUNNING;	
+
+	pthread_t getTaskFunc;
+	if(pthread_create(&getTaskFunc, NULL, getTask, this))
+		cout << "create thread error" << endl;
+	void *exit = (int*)malloc(4);
+	pthread_detach(getTaskFunc);
+	pthread_join(getTaskFunc, &exit);
+					
+	pthread_t pjobAssign;
+	pthread_create(&pjobAssign, NULL, jobAssign, this);
+	pthread_join(pjobAssign,&exit);
+}
+
+
+int Slave::run()
+{
+/*	pthread_t pgetTask;
+	pthread_create(&pgetTask, NULL, getTask, this);
+	void *exit = (int*)malloc(4);
+	pthread_join(pgetTask,&exit);*/
+}
+
+
+void Slave::reportAlive()
+{
+}
+
+void *Slave::getTask(void *s)	//负责接收任务，将job插入到job队列中
+{
+	Slave* self = (Slave*)s;
+	ClientSocket client;
+	client = self->m_client;
+	while(self->m_Status == RUNNING)
+	{
+		string data;
+		string port;
+		int portnum;
+		client >> data;
+		client >> port;
+		int taskCode;
+		stringstream ss,ss2;
+		ss << data;
+		ss >> taskCode;
+		ss2 << port;
+		ss2 >> portnum;
+		switch(taskCode)
+		{
+			case 1:
+				job j;
+				j.jobtype = 1;
+				j.j_Status = 0;
+				j.portnum = portnum;
+				self->m_jobList.push(j);
+				break;
+			case 2:
+				cout << self->localAddress <<"is shutting down!" << endl;
+				self->m_Status = STOPPED;
+				exit(0);
+				break;
+			case 3:
+				job j;
+				j.jobtype = 3;
+				j.j_Status = 0;
+				j.portnum = portnum;
+				self->m_jobList.push(j);
+				break;
+			default:
+				break;
+	
+		}
+	}
+}
+
+void* Slave::jobAssign(void* s)	//负责根据job列表来分派任务
+{
+	Slave* self = (Slave*)s;
+	while(self->m_Status == RUNNING)
+	{
+		if(self->m_jobList.size() != 0 && self->m_jobList.front().j_Status == 0)
+		{
+			job j = self->m_jobList.front();
+			switch(j.jobtype)
+			{
+				case 1:
+				{
+					pthread_t psendSysinfo;
+					pthread_create(&psendSysinfo, NULL, sendSysinfo, self);
+					void *exit = (int*)malloc(4);
+					pthread_join(psendSysinfo,&exit);
+					j.j_Status = 1;
+					break;
+				}
+				case 3:
+				{
+					pthread_t ppartition;
+					pthread_create(&ppartition, NULL, partition, self);
+					void *exit = (int*)malloc(4);
+					pthread_join(ppartition,&exit);
+					j.j_Status = 1;
+					break;
+				}
+				default:
+					break;
+			}
+		}
+		if(self->m_jobList.size() != 0 && self->m_jobList.front().j_Status == 2)
+		{
+			self->m_jobList.pop();
+		}
+
+	}
+}
+
+void* Slave::sendSysinfo(void* s)
+{
+	Slave* self = (Slave*)s;
+	job j;
+	if(self->m_jobList.front().jobtype != 1)
+	{
+		cout << "send sysinfo job error" << endl;
+		exit(0);
+	}
+//	cout << "sendsysinfo portnum " << self->m_jobList.front().portnum <<  " to " << self->masterAddress << endl;	
+	int pid = getpid();
+	
+//	cout << "cliend?"<<endl;
+	//sleep(1);
+	ClientSocket client(self->masterAddress, self->m_jobList.front().portnum);
+//	cout << "cliend!!"<< endl;
+//	client  << self->localAddress << " has got task1" << endl;
+//	client = self->m_client;
+	char memfile[64];
+	sprintf(memfile, "/proc/%d/status", pid);
+	ifstream ifs;
+	ifs.open(memfile, ios::in);
+	if (!ifs.fail())
+	{
+	   // this looks for the VmSize line in the process status file
+	    char buf[1024];
+		buf[0] = '\0';
+		while (!ifs.eof())
+		{
+			ifs.getline(buf, 1024);
+			if (string(buf).substr(0, 6) == "VmSize")
+				break;
+		}
+		string tmp;
+		stringstream ss;
+		ss.str(buf);
+		ss >> tmp >> self->m_llCurrMemUsed;
+		self->m_llCurrMemUsed *= 1024;
+		ifs.close();
+	}
+	string msg;
+	msg = "current mem used:";
+	string sllCurrMemUsed;
+	stringstream ss;
+	ss << self->m_llCurrMemUsed;
+	ss >> sllCurrMemUsed;
+	msg += sllCurrMemUsed;
+	client << msg;
+	self->m_jobList.front().j_Status = 2;
+}
+
+void* Slave::partition(void* s)
+{
+
+}
+
+
+void timefunc(int sig)      /* 定时事件代码 */
+{
+	fprintf(stderr, "ITIMER_PROF[%d]\n", n++);
+	cout << "f" << endl;
+//	listening = false;
+//	tcp.close();
+//	fprintf(stderr, "ITIMER_PROF[%d]/n", n++);
+	signal(SIGPROF, timefunc);    /* 捕获定时信号 */
+}
+
+void clock(int second)
+{
+	struct itimerval value;
+	value.it_value.tv_sec = second;
+	value.it_value.tv_usec = 0;
+	value.it_interval.tv_sec = 1;
+	value.it_interval.tv_usec = 0;
+	
+	signal(SIGPROF, timefunc); 
+	setitimer(ITIMER_REAL, &value, NULL);
+}
+

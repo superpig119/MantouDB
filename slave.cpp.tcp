@@ -1,0 +1,193 @@
+#include "slave.h"
+#include <sstream>
+#include <unistd.h>
+#include <signal.h>
+#include <stdio.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <stdlib.h>
+
+using namespace std;
+
+int n = 0;
+Slave::Slave()
+{
+}
+
+Slave::~Slave()
+{
+}
+
+int Slave::init()
+{
+	inCmdPort = 53001;
+	outCmdPort = 53000;
+
+	//TCPTransport tcp;
+	tcp.open(outCmdPort);
+	if(!cr.getMasterAddress("./mantouDB/mantouDB/masterlist", masterAddress))
+		return 0;
+	tcp.connect(masterAddress, outCmdPort);
+	localAddress = cr.GetLocalIP();
+	string report = localAddress + " is started!";
+	//string msg;
+//	msg = "current mem used:";
+	
+
+	getSysinfo();
+	string sllCurrMemUsed;
+	stringstream ss;
+	ss << m_llCurrMemUsed;
+	ss >> sllCurrMemUsed;
+//	msg += sllCurrMemUsed;
+	if(tcp.isConnected())
+	{
+		cout << "init connect success" << endl;
+		cout << tcp.send(report.c_str(), report.length());
+		cout << localAddress << " sent" << endl;
+	}
+	else
+		cout << "connent fail!" << endl;
+	m_Status = RUNNING;	
+//	tcp.close();
+
+	pthread_t getTaskFunc;
+	if(pthread_create(&getTaskFunc, NULL, getTask, this))
+		cout << "create thread error" << endl;
+	void *exit = (int*)malloc(4);
+	//pthread_detach(getTaskFunc);
+	pthread_join(getTaskFunc, &exit);
+	
+}
+
+
+int Slave::run()
+{
+/*	pthread_t pgetTask;
+	pthread_create(&pgetTask, NULL, getTask, this);
+	void *exit = (int*)malloc(4);
+	pthread_join(pgetTask,&exit);*/
+}
+
+
+void Slave::reportAlive()
+{
+}
+
+void *Slave::getTask(void *s)
+{
+	Slave* self = (Slave*)s;
+//	TCPTransport tcp;
+//	tcp.open(self->inCmdPort);
+//	tcp.listen();
+	cout << "status:"<<self->m_Status<<endl;
+		string ip;
+		int port, size;
+//		TCPTransport* t = tcp.accept(ip, port);
+	while(self->m_Status == RUNNING)
+	{	
+		//cout << self->localAddress << " listening" << endl;
+		char* data = (char*)malloc(1);
+		size = 1;
+		memset(data,0,size);
+		/*if (NULL == t)
+		{
+			cout << "slave waiting" << endl;
+			continue;
+		}*/
+	//	cout << port << endl;
+	//	if(self->tcp.isConnected())
+	//		cout << "slave is connected" << endl;
+	cout << "slaverecv:" << self->tcp.recv(data, size) << endl;
+	//:v	cout << "slave data:" << data << endl;
+		string s = data;
+		if(s == "")
+			continue;
+	//	cout << self->localAddress << " receive data " << data << endl;
+		int d = atoi(data);
+		cout << self->localAddress << " receivejob d:" << d << endl;
+		switch(d)
+		{
+			case 1:
+				cout  << "slave push to joblist" << endl;
+				job j;
+				j.jobtype = 1;
+				j.j_Status = 0;
+				self->jobList.push(j);
+			/*	string msg;
+				msg = "current mem used:";
+				getSysinfo();
+				string sllCurrMemUsed;
+				stringstream ss;
+				ss << m_llCurrMemUsed;
+				ss >> sllCurrMemUsed;
+				msg += sllCuddrrMemUsed;
+				if(tcp.isConnected())
+				{
+					cout << "stat connect success" << endl;
+					cout << t.send(msg.c_str(), msg.length()) << endl;
+				}
+				else
+					cout << "connent fail!" << endl;
+			*/	cout << "send slave stat!" << endl;
+				self->m_Status = STOPPED;
+				break;
+			default:
+				break;
+	
+		}
+		//t->close();
+		//break;
+	}
+	//tcp.close();
+}
+
+void Slave::getSysinfo()
+{
+	int pid = getpid();
+	char memfile[64];
+	sprintf(memfile, "/proc/%d/status", pid);
+	ifstream ifs;
+	ifs.open(memfile, ios::in);
+	if (!ifs.fail())
+	{
+	   // this looks for the VmSize line in the process status file
+	    char buf[1024];
+		buf[0] = '\0';
+		while (!ifs.eof())
+		{
+			ifs.getline(buf, 1024);
+			if (string(buf).substr(0, 6) == "VmSize")
+				break;
+		}
+		string tmp;
+		stringstream ss;
+		ss.str(buf);
+		ss >> tmp >> m_llCurrMemUsed;
+		m_llCurrMemUsed *= 1024;
+		ifs.close();
+	}
+}
+
+
+void timefunc(int sig)      /* 定时事件代码 */
+{
+	fprintf(stderr, "ITIMER_PROF[%d]\n", n++);
+	cout << "f" << endl;
+//	listening = false;
+//	tcp.close();
+//	fprintf(stderr, "ITIMER_PROF[%d]/n", n++);
+	signal(SIGPROF, timefunc);    /* 捕获定时信号 */
+}
+
+void clock(int second)
+{
+	struct itimerval value;
+	value.it_value.tv_sec = second;
+	value.it_value.tv_usec = 0;
+	value.it_interval.tv_sec = 1;
+	value.it_interval.tv_usec = 0;
+	
+	signal(SIGPROF, timefunc); 
+	setitimer(ITIMER_REAL, &value, NULL);
+}

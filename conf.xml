@@ -1,0 +1,18 @@
+<Relation neme="test1">
+	<Dnum>4</Dnum>
+	<D ID="1">
+		<DClass>1</DClass>
+	</D>
+	
+	<D ID="2">
+		<DClass>2</DClass>
+	</D>
+	
+	<D ID="3">
+		<DClass>3</DClass>
+	</D>
+
+	<D ID="4">
+		<DClass>4</DClass>
+	</D>
+</Relation>

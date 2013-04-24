@@ -1,0 +1,60 @@
+.PHONY:start_master
+CXX=g++
+udt= md5.o common.o window.o list.o buffer.o packet.o channel.o queue.o core.o cache.o epoll.o api.o ccc.o
+start_master:conf.o master.o start_master.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o user.o tcptransport.o 
+	g++ -o start_master conf.o master.o start_master.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o user.o  tcptransport.o $(udt)
+
+
+#SRC =  conf.cpp master.cpp start_master.cpp
+tinyxml.o:
+	cd ./tinyxml && make
+tinyxmlerror.o:
+	cd ./tinyxml && make
+tinyxmlparser.o:
+	cd ./tinyxml && make
+tinystr.o:
+	cd ./tinyxml && make
+md5.o:
+	cd ./udt && make
+common.o:
+	cd ./udt && make
+window.o:
+	cd ./udt && make
+list.o:
+	cd ./udt && make
+buffer.o:
+	cd ./udt && make
+packet.o:
+	cd ./udt && make
+channel.o:
+	cd ./udt && make
+queue.o:
+	cd ./udt && make
+core.o:
+	cd ./udt && make
+cache.o:
+	cd ./udt && make
+epoll.o:
+	cd ./udt && make
+api.o:
+	cd ./udt && make
+ccc.o:
+	cd ./udt && make
+
+conf.o:conf.cpp conf.h
+	$(CXX) -c conf.cpp
+master.o:master.cpp master.h
+	$(CXX) -c master.cpp
+user.o:user.h user.cpp
+	$(CXX) -c user.cpp
+tcptransport.o:transport.h tcptransport.h tcptransport.cpp
+	$(CXX) -c tcptransport.cpp
+start_master.o:start_master.cpp
+	$(CXX) -c start_master.cpp
+#start_master:
+#	g++ -o start_master $(SRC)
+#	cd ./tinyxml && $(MAKE)
+
+clean:
+	rm -f *.o start_master
+	rm -f ./tinyxml/*.o

@@ -1,0 +1,16 @@
+#!/bin/bash
+pid=$(netstat -apn | grep 53000)
+pid=${pid:80:5}
+pid=${pid%/*}
+echo $pid
+kill -9 $pid
+pid=$(netstat -apn | grep 53000)
+pid=${pid:80:5}
+pid=${pid%/*}
+echo $pid
+kill -9 $pid
+pid=$(netstat -apn | grep 53000)
+pid=${pid:80:5}
+pid=${pid%/*}
+echo $pid
+kill -9 $pid

@@ -1,0 +1,315 @@
+#include <iostream>
+#include <string>
+#include "master.h"
+#include <pthread.h>
+#include <unistd.h>
+#include <signal.h>
+#include <stdio.h>
+#include <sys/select.h>
+#include <sys/time.h>
+#include <sstream>
+
+using namespace std;
+int n = 0;
+
+Master::Master()
+{
+}
+
+Master::~Master()
+{
+}
+
+int Master::init()
+{
+    relStyle rel;
+    string filename = "conf.xml";
+    cr.ReadConfFile(filename, rel); //获取masterconf数据
+    cout << rel.DNum << endl;
+    vector<int>::iterator irel;
+    for(irel = rel.DClass.begin(); irel != rel.DClass.end(); irel++)
+        cout << *irel << endl;
+	m_Status = RUNNING;
+	inCmdPort = 53000;
+	outCmdPort = 53001;
+
+    return 0;
+}
+
+
+int Master::run()
+{
+	pthread_t startserver;
+	if(pthread_create(&startserver, NULL, start, this))		//start线程，启动每个slave，对joblist做初始化
+		cout << "create thread error" << endl;
+	void *exit = (int*)malloc(4);
+//	pthread_detach(startserver);
+	pthread_join(startserver, &exit);
+
+}
+
+void* Master::start(void *s)
+{
+	Master* self = (Master*)s;
+	
+	TCPTransport tcp;
+	tcp.open(self->inCmdPort);
+	tcp.listen();
+	self->listening = true;
+	string base;
+	self->cr.getSlaveList("slaves", base, self->slave_list);
+	vector<string>::iterator islave;
+	for(islave = self->slave_list.begin(); islave != self->slave_list.end(); islave++)	//根据slave文件启动每一个节点的slave
+	{
+		self->startSlave(*islave, base, "", "");		
+	//	cout << "starting " << *islave << endl;
+	}
+	int count = 0;
+	vector<TCPInfo> vTCPInfo;
+	while(self->m_Status == RUNNING)
+	{
+		string ip;
+		int port, size;
+		char* data = (char*)malloc(50);
+		size = 50;
+		memset(data,0,size);
+		//cout << "???" << endl;
+		TCPTransport* t = tcp.accept(ip, port);
+		if (NULL == t)
+		{
+			cout << "master waiting" << endl;
+			continue;
+		}
+	//	cout << "!!!" << endl;
+		count++;
+	//	cout << "count:" << count << endl;
+		cout << t->recv(data, size) << endl;
+	//	cout << "data:" << data << endl;
+	//	cout << "recved" << endl;
+		int i;
+		string str;
+		for(i = 0; i < 16; i++)
+		{
+			if(data[i] == ' ')
+			{
+				break;
+			}
+			str += data[i];
+		}
+		cout << "data: " << data << endl;	
+		TCPInfo tinfo;		//把建立起来的t给保存下来
+		tinfo.tcp = *t;
+		tinfo.ip = str;
+		tinfo.outport = self->outCmdPort;
+		tinfo.inport = self->inCmdPort;
+		tinfo.m = self;
+		vTCPInfo.push_back(tinfo);
+	
+	/*	pthread_t pslavecom;
+		pthread_create(&pslavecom, NULL, SlaveCom, &tinfo);
+		void* exit = (int*)malloc(4);
+		pthread_detach(pslavecom);
+		pthread_join(pslavecom, &exit);		
+	*/	
+		struct SlaveNode sn;
+		sn.ip = str;
+		self->activeSlaves.push_back(sn);
+		
+
+		slaveJob sj;
+		sj.slave = str;
+		job j;
+		j.jobtype = 1;
+		j.j_Status = 0;
+		sj.slaveJobList.push(j);
+		self->jobList.push_back(sj);
+//	t->close();
+//	delete t;
+		if(count == self->slave_list.size())
+			break;
+	}
+	
+	vector<struct SlaveNode>::iterator islavenode;
+	for(islavenode = self->activeSlaves.begin(); islavenode != self->activeSlaves.end(); islavenode++)	//根据slave文件启动每一个节点的slave
+	{
+		cout << "active slaves:" << (*islavenode).ip << endl;
+	}
+
+	vector<slaveJob>::iterator islavejob;
+	for(islavejob = self->jobList.begin(); islavejob != self->jobList.end(); islavejob++)	//根据slave文件启动每一个节点的slave
+	{
+		cout << "slave job:" << (*islavejob).slave << endl;
+		cout << "slave job type:" << (*islavejob).slaveJobList.front().jobtype << endl;
+		cout << "slave job status:" << (*islavejob).slaveJobList.front().j_Status << endl;
+	}
+
+//	tcp.close();
+	
+/*	//vector<struct SlaveNode>::iterator islavenode;
+	for(islavenode = self->activeSlaves.begin(); islavenode != self->activeSlaves.end(); islavenode++)	//根据slave文件启动每一个节点的slave
+	{
+		TCPTransport tcp;
+		tcp.open(self->inCmdPort);
+		tcp.connect((*islavenode).ip, self->outCmdPort);
+	//	tcp.listen();
+		if(tcp.isConnected())
+		{
+			TCPInfo tinfo;
+			tinfo.tcp = tcp;
+			tinfo.ip = (*islavenode).ip;
+			tinfo.outport = self->outCmdPort;
+			cout << "outport" << tinfo.outport << endl;
+			tinfo.inport = self->inCmdPort;
+			tinfo.m = self;
+			vTCPInfo.push_back(tinfo);
+
+			cout << "slave connect success to " << (*islavenode).ip << endl;
+		*	string report = "1";
+			tcp.send(report.c_str(), report.length());*/
+	/*	}
+		else
+			cout << "slave connent fail!" << endl;
+	}*/
+	vector<TCPInfo>::iterator iTCPInfo;
+	for(iTCPInfo = vTCPInfo.begin(); iTCPInfo != vTCPInfo.end(); iTCPInfo++)
+	{
+		TCPInfo tinfo = *iTCPInfo;
+		cout << "tinfoip:" << tinfo.ip << endl;
+		cout << "tinfooutport:" << tinfo.outport << endl;
+		pthread_t pslavecom;
+		pthread_create(&pslavecom, NULL, SlaveCom, &tinfo);
+		void* exit = (int*)malloc(4);
+		pthread_detach(pslavecom);
+		pthread_join(pslavecom, &exit);		
+		sleep(2);
+	}
+
+
+	pthread_t pshell;		//启动shell
+	if(pthread_create(&pshell, NULL, Shell, self))
+		cout << "create thread error" << endl;
+	void *exit = (int*)malloc(4);
+//	pthread_detach(pshell);
+	pthread_join(pshell, &exit);
+}
+
+void* Master::SlaveCom(void *s)
+{
+	sleep(1);
+	TCPInfo* self = (TCPInfo*)s;
+//	TCPTransport *t = (TCPTransport*)malloc(sizeof(TCPTransport*));
+	vector<slaveJob>::iterator ij;
+	cout << "sending cmd to" <<  self->ip <<  ":" << self->inport<<endl;
+//	self->tcp.listen();
+	queue<job>* pslaveJob = (queue<job>*)malloc(16);
+	for(ij = self->m->jobList.begin(); ij != self->m->jobList.end(); ij++)
+	{
+		if((*ij).slave == self->ip)		//找到该slave的job队列
+		{
+			pslaveJob = &(*ij).slaveJobList;
+			//cout << "getting first job " <<pslaveJob->front().jobtype << endl;
+			break;
+		}
+	}	
+	string ip;
+	int port;
+	while(self->m->m_Status == RUNNING)
+	{
+		//if(self->tcp.isConnected())
+		//	cout << "t is connected!" << endl;
+		if(pslaveJob->size() != 0 && pslaveJob->front().j_Status == 0) //如果job列表不空且第一个job状态为等待处理，则将其提交给slave
+		{
+			job j = pslaveJob->front();
+			int jobtype = j.jobtype;
+		//	string cmd = jobtype;
+			char* cmd = (char*)malloc(10);
+		if(self->tcp.isConnected())
+			cout << "t is connected!" << endl;
+			memset(cmd, 0, 10);
+			sprintf(cmd, "%d ", jobtype); 
+			cout << "send size: " << self->tcp.send(cmd, sizeof(cmd)) << endl;
+			cout << "cmd:" << cmd << endl; 
+			pslaveJob->front().j_Status = 1;
+		}
+	/*	t = self->tcp.accept(ip, port);
+		if(NULL != t)
+		{
+			char* data = (char*)malloc(50);
+			int size = 50;
+			memset(data,0,size);
+			t->recv(data, size);
+			cout << data << endl;
+		}*/
+	}
+}
+
+void Master::sendCmd(string cmd)
+{
+
+}
+
+void Master::startSlave(const std::string& addr, const std::string& base, const std::string& option, const std::string& log)
+{/*
+	string slave_screen_log = "/dev/null";
+    if (!log.empty())
+		slave_screen_log = log;
+	string start_slave = base + "/mantouDB/slave/";
+	//string cmd = (string("ssh -p 13022 -o StrictHostKeychecking=no ") + addr + " mkdir " + base  + "/test");
+	string cmd = (string("ssh -p 13022 -o StrictHostKeychecking=no ") + addr + " " + base  + "/mantouDB/start_slave");
+	//string cmd = (string("ssh -p 13022 -o StrictHostKeychecking=no ") + addr + " \"" + start_slave + " " + base + " " + option + " &> " + slave_screen_log + "&\" &");
+
+	system(cmd.c_str());
+//	string cmd = (string("ssh " +addr + " mkdir ./mantouDB/shanpao "));
+//	system(cmd.c_str());*/
+	tmp1 = addr;
+	tmp2 = base;
+	struct addrStruct t;
+	t.addr = addr;
+	t.base = base;
+	cout << t.addr << endl;
+	pthread_t pstartSlave;
+	
+	if(pthread_create(&pstartSlave, NULL, System, &(t)))
+		cout << "create thread error" << endl;
+	void *exit = (int*)malloc(4);
+	pthread_detach(pstartSlave);
+	pthread_join(pstartSlave, &exit);
+	usleep(100);
+}
+
+void* Master::System(void *s)
+{
+	struct addrStruct *self;
+	self = (struct addrStruct*)s;
+	string start_slave = self->base + "/mantouDB/slave/";
+	string cmd = (string("ssh -p 13022 -o StrictHostKeychecking=no ") + self->addr + " " + self->base  + "/mantouDB/start_slave");
+	cout << "starting " << self->addr << endl;
+	system(cmd.c_str());
+}
+/*
+void* Master::SendJob(void *s)
+{
+		
+}
+*/
+void* Master::Shell(void *s)
+{
+	Master* self = (Master*)s;
+	string line, word;
+	cout << ">>";
+	while(getline(cin,line))
+	{
+		istringstream stream(line);
+		while(stream >> word)
+		{
+			if("q" == word)
+			{
+				self->m_Status = STOPPED;
+				cout << "bye" << endl;
+				exit(0);
+			}
+			//else if("get slave stat")
+		}
+		cout << ">>";
+	}
+}
