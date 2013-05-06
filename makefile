@@ -1,7 +1,7 @@
 .PHONY:start_master
 CXX=g++
-start_master:conf.o master.o start_master.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o user.o tcptransport.o ServerSocket.o Socket.o ClientSocket.o	
-	g++ -o start_master conf.o master.o start_master.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o user.o  tcptransport.o ServerSocket.o Socket.o -lpthread 
+start_master:conf.o master.o start_master.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o user.o tcptransport.o ServerSocket.o Socket.o ClientSocket.o	MTFS.o
+	g++ -o start_master conf.o master.o start_master.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o user.o  tcptransport.o ServerSocket.o Socket.o MTFS.o -lpthread -g
 	g++ -o start_slave start_slave.cpp slave.cpp tcptransport.cpp conf.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o ClientSocket.o Socket.o -lpthread 
 	mv *.o ./obj
 	g++ -o stop_all stop_all.cpp
@@ -24,6 +24,8 @@ ClientSocket.o:
 
 conf.o:conf.cpp conf.h
 	$(CXX) -c conf.cpp
+MTFS.o: MTFS.cpp MTFS.h
+	$(CXX) -c MTFS.cpp
 master.o:master.cpp master.h
 	$(CXX) -c master.cpp
 user.o:user.h user.cpp
@@ -36,6 +38,7 @@ slave.o:slave.cpp slave.h
 	$(CXX) -c slave.cpp
 slave_start.o:start_slave.cpp
 	$(CXX) -c slave_slave.cpp
+
 #start_master:
 #	g++ -o start_master $(SRC)
 #	cd ./tinyxml && $(MAKE)

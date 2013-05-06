@@ -56,18 +56,32 @@ typedef struct MAPNODE
 {
 	string dname;
 	int maptype; //作为选择下面三种映射的依据
-	multimap<string, int> msi;
-	multimap<int, int> mii;
-	multimap<float, int> mfi;
+	vector<pair<string, int> > vsi;
+	vector<pair<int, int> > vii;
+	vector<pair<float, int> > vfi;
+
+//	multimap<string, int> msi;
+//	multimap<int, int> mii;
+//	multimap<float, int> mfi;
 }mapnode;
 
 typedef struct TABLEINFO
 {
+	string filename;
+	string confname;
 	string tableName;
 	vector<string> dindex;
 	vector<mapnode> dlist;
 	vector<int> dcnum; //每一维每一slave上的划分数
 }tableinfo;
+
+typedef struct SPLITFILE
+{
+	string line;
+	vector<int> xi;
+	string dnum;
+	int x;
+}splitfile;
 
 
 class Master
@@ -93,8 +107,8 @@ public:
 	static void* jobChecker(void *s);
 	static void* getPartition(void *s);
 	static void* test(void *s);
-	//static void* dataInit(void* s);
-	void dataInit();
+	static void* dataInit(void* s);
+//	void dataInit();
 public:
 	enum Status {INIT, RUNNING, STOPPED} m_Status;   // system status
 	ConfReader cr;
