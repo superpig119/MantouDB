@@ -1,0 +1,375 @@
+/*	vector<tableinfo>::iterator  im_vtableInfo;
+	im_vtableInfo = (self->m_vtableInfo.end()) - 1;
+	vector<mapnode>::iterator idlist;
+	cout << "in datainit!!!" << endl;
+	stringstream ss;
+	while(1)
+	{
+		if((*im_vtableInfo).dlist.size() == (*im_vtableInfo).dcnum.size())
+		{
+			ifstream  infile, inconf;
+			string filepath = "../data/";
+			infile.open((filepath + (*im_vtableInfo).filename).c_str());
+			if(!infile)
+			{
+				cout << "cannot open file " << (*im_vtableInfo).filename << "!" << endl;
+				continue;
+			}
+			inconf.open((filepath + (*im_vtableInfo).confname).c_str());
+			if(!inconf)
+			{
+				cout << "cannot open fileconf " << (*im_vtableInfo).confname << "!" << endl;
+				continue;
+			}
+			int linenum, dnum, i;
+			string sline, sdnum;
+			//inconf >> linenum >> dnum;
+			getline(inconf, sline);
+			getline(inconf, sdnum);
+			ss.clear();
+			ss << sline;
+			ss >> linenum;
+			ss.clear();
+			ss << sdnum;
+			ss >> dnum;
+			string pos;
+			string line;
+			vector<int> vpos;
+			vector<int>::iterator ivpos;
+			int ipos;
+		//	cout << linenum << " " << dnum << endl;
+			line = "";
+			getline(inconf,line);
+			//cout << "line:" << line << endl;
+			istringstream stream(line);
+			vector<splitfile> sp;
+			vector<splitfile>::iterator isp;
+			while(stream >> pos)	//获取切分位置
+			{
+				ss.clear();
+				ss << pos;
+				ss >> ipos;
+			//	cout << ipos << endl;
+				vpos.push_back(ipos);
+			}
+			for(ivpos = vpos.begin(); ivpos != vpos.end();ivpos++)	//除第一个外，每个都多ID
+			{
+				if(ivpos != vpos.begin())
+					(*ivpos)++;
+			}
+			ivpos = vpos.begin();
+			string linetmp;
+			line = "";
+			getline(infile,line);
+		//	cout << line << endl;
+			vector<int> d;
+			vector<int>::iterator ivd;
+			int dcount;
+			int keynum;
+			string key;
+			for(i = 0; i < linenum; i++)
+			{
+				int c = 0;
+				string num;
+				for(ivpos = vpos.begin(); ivpos != vpos.end();ivpos++)
+				{
+					c++;
+					ss.clear();
+					ss << c;
+					ss >> num;
+					splitfile spx;
+				//	cout << "num:" << num << endl;
+					spx.x = 0;
+					spx.dnum = num;
+					sp.push_back(spx);
+				}
+				line = "";
+				getline(infile,line);
+				int comapos1 = 0, comapos2 = 0;
+				int x = 0;
+				keynum = 0;	
+				dcount = 0;
+				isp = sp.begin();
+				ivpos = vpos.begin();
+				for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
+				{	
+					
+					comapos2 = line.find(',',comapos1);
+					linetmp = line.substr(comapos1, comapos2 - comapos1);			
+				//	cout << linetmp << endl;
+					int type = (*idlist).maptype;
+					if(dcount == *ivpos)	// 开启新的一段
+					{
+						dcount = 1;	
+						ivpos++;
+						isp++;
+						if(isp != sp.end())
+						{
+							(*isp).line = key;
+							(*isp).xi.push_back(keynum); 
+							(*isp).x = keynum;
+						}
+					}
+					dcount++;
+				//	cout << "dcount:" << dcount << endl;
+					comapos1 = comapos2 + 1;
+					switch(type)
+					{
+						case 10:
+					case 11:
+						case 12:
+						{
+							int n, min, xi;
+							vector<pair<int, int> >::iterator ii1, ii2, ii3;
+							ss.clear();
+							ss << linetmp;
+							ss >> n;
+							if(idlist == (*im_vtableInfo).dlist.begin())
+							{
+								key = linetmp;
+								(*isp).line = linetmp;
+							}
+							else
+							{
+								(*isp).line = (*isp).line +  "," + linetmp;
+							}
+
+							if(comapos1 == comapos2)
+							{
+								n = 0;
+							}
+							ii1 = (*idlist).vii.begin(); 
+							ii2 = (*idlist).vii.begin() + 1;
+							while(1)
+							{
+								while(n > (*ii1).first && (*ii2).first == (*ii1).first && (ii2 + 1) != (*idlist).vii.end())
+								{
+									ii2 += 1;
+								}
+								if(n > (*ii2).first && (ii2 + 1) != (*idlist).vii.end())
+								{
+									ii1 = ii2;
+									ii2 += 1;
+								}
+								else 
+									break;
+							}	
+							min = (*ii1).second;
+							ii3 = ii1;
+							for(; ii1 != ii2; ii1++)
+							{
+								if(min > (*ii1).second)
+								{
+									min = (*ii1).second;
+									ii3 = ii1;
+								}
+							}
+							for(xi = 0, ii1 = (*idlist).vii.begin(); ii1 != ii3;xi++, ii1++)
+							{
+							}
+							xi++;
+							(*ii3).second += 1;
+				//			cout << "count:" << (*ii3).second << endl;
+							x += xi;
+							d.push_back(xi);
+							keynum = xi;
+							(*isp).xi.push_back(xi);
+							(*isp).x += xi;
+							break;
+						}
+						case 20:
+						{
+							float n;
+							int xi, min;
+							vector<pair<float, int> >::iterator fi1, fi2, fi3;
+							ss.clear();
+							ss << linetmp;
+							ss >> n;
+							if(comapos1 == comapos2)
+							{
+								n = 0;
+							}
+							fi1 = (*idlist).vfi.begin(); 
+							fi2 = (*idlist).vfi.begin() + 1;
+							while(1)
+							{
+								while(n > (*fi1).first && (*fi2).first == (*fi1).first && (fi2 + 1) != (*idlist).vfi.end())
+								{
+									fi2 += 1;
+								}
+								if(n > (*fi2).first && (fi2 + 1) != (*idlist).vfi.end())
+								{
+									fi1 = fi2;
+									fi2 += 1;
+								}
+								else 
+									break;
+							}	
+							(*isp).line = (*isp).line +  "," + linetmp;
+							min = (*fi1).second;
+							fi3 = fi1;
+							for(; fi1 != fi2; fi1++)
+							{
+								if(min > (*fi1).second)
+								{
+									min = (*fi1).second;
+									fi3 = fi1;
+								}
+							}
+							for(xi = 0, fi1 = (*idlist).vfi.begin(); fi1 != fi3;xi++, fi1++)
+							{
+							}
+							xi++;
+							(*fi3).second += 1;
+							x += xi;
+							d.push_back(xi);
+							(*isp).xi.push_back(xi);
+							(*isp).x += xi;
+							break;
+						}
+						case 30:
+						{
+							string n = linetmp;
+							int xi, min;
+							vector<pair<string, int> >::iterator si1, si2, si3;
+							if(comapos1 == comapos2)
+							{
+								n = "";
+							}
+							(*isp).line = (*isp).line +  "," + linetmp;
+				//			cout << "n:" << n << endl;
+							si1 = (*idlist).vsi.begin(); 
+							si2 = (*idlist).vsi.begin() + 1;
+							while(1)
+							{
+								if(n == "")
+								{
+									while((*si2).first == "")
+										si2++;
+									break;
+								}
+
+								while(n > (*si1).first && (*si2).first == (*si1).first && (si2 + 1) != (*idlist).vsi.end())
+								{
+									si2 += 1;
+								}
+								if(n >= (*si2).first && (si2 + 1) != (*idlist).vsi.end())
+								{
+									si1 = si2;
+									si2 += 1;
+								}
+								else 
+									break;
+							}	
+							min = (*si1).second;
+							si3 = si1;
+							for(; si1 != si2; si1++)
+							{
+								if(min > (*si1).second)
+								{
+									min = (*si1).second;
+									si3 = si1;
+								}
+							}
+							for(xi = 0, si1 = (*idlist).vsi.begin(); si1 != si3;xi++, si1++)
+							{
+							}
+							xi++;
+							(*si3).second += 1;
+							x += xi;
+							d.push_back(xi);
+							(*isp).xi.push_back(xi);
+							(*isp).x += xi;
+							break;
+						}
+						default:
+							break;
+					}
+				}
+//				cout << x << endl;
+				vector<int>::iterator ixi;
+				string fpath = "../data/tmp/";
+				for(isp = sp.begin(); isp != sp.end(); isp++)
+				{
+				//	cout << (*isp).line << endl;
+					string strx, strpartnum;
+					int cmd, partnum;
+					cmd = (*isp).x % self->activeSlaves.size() + 1; //slave号
+					partnum = (*isp).x / self->activeSlaves.size();	//
+				//	cout << "cmd:" << cmd << endl;
+					ss.clear();
+					ss << cmd;
+					ss >> strx;
+					ss.clear();
+					ss << x;
+					ss >> strpartnum;
+					string fname;
+					string fd,tmp;
+					for(ixi = (*isp).xi.begin(); ixi != (*isp).xi.end(); ixi++)
+					{
+						ss.clear();
+						ss << *ixi;
+						ss >> tmp;
+						fd += tmp;
+						if(ixi + 1 == (*isp).xi.end())
+							break;
+						fd += ".";
+					}
+				//	cout << "fd:" << fd << endl;
+					vector<tableinfo>::iterator  im_vtableInfo2;
+					im_vtableInfo2 = (self->m_vtableInfo.end()) - 1;
+					vector<mapnode>::iterator idlist;
+					fname = fpath + (*im_vtableInfo2).tableName + "." + strx + "." + (*isp).dnum + "." + fd;
+				//	cout << fname << endl;
+					ofstream of;	
+					of.open(fname.c_str(), ofstream::out | ofstream::app);
+					of << (*isp).line << endl; 
+					of.close();
+				}
+				d.clear();
+				sp.clear();
+//				
+				string strx, strpartnum;
+				int cmd, partnum;
+				cmd = x % self->activeSlaves.size() + 1;
+				partnum = x / self->activeSlaves.size();
+		//		cout << "cmd:" << cmd << endl;
+				ss.clear();
+				ss << cmd;
+				ss >> strx;
+				ss.clear();
+				ss << x;
+				ss >> strpartnum;
+				string fname;
+				string fd,tmp;
+				for(ivd = d.begin(); ivd != d.end(); ivd++)
+				{
+					ss.clear();
+					ss << *ivd;
+					ss >> tmp;
+					fd += tmp;
+					if(ivd + 1 == d.end())
+						break;
+					fd += ".";
+				}
+				d.clear();
+				string fpath = "../data/tmp/";
+				vector<tableinfo>::iterator  im_vtableInfo2;
+				im_vtableInfo2 = (self->m_vtableInfo.end()) - 1;
+				vector<mapnode>::iterator idlist;
+				fname = fpath + (*im_vtableInfo2).tableName + "." + strx + "." + fd;
+				ofstream of;
+				of.open(fname.c_str(), ofstream::out | ofstream::app);
+				of << line << endl; 
+				of.close();
+*/
+		/*
+			cout << "FINISH!" << endl;
+			for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
+			{
+				
+				cout << (*idlist).dname << endl;
+			}
+			break;
+		}
+	}*/

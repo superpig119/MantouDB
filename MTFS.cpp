@@ -1,4 +1,3 @@
-#include "MTFS.h"
 #include "master.h"
 #include <algorithm>
 
@@ -32,18 +31,18 @@ bool operator<=(const smallfile &s1, const smallfile &s2)
 	return s1.d <= s2.d;
 }
 
-void MTFSop::dataInit(void *s)
+void MTFS::dataSplit(void *s)
 {
 	Master* self = (Master*)s;
 	vector<tableinfo>::iterator im_vtableInfo, im_vtableInfo2;
-	im_vtableInfo = (self->m_vtableInfo.end()) - 1;
+	im_vtableInfo = (self->mt.m_vtableInfo.end()) - 1;
 	vector<mapnode>::iterator idlist;
 	cout << "in datainit!!!" << endl;
 	stringstream ss;
 	string strx;
-	vector<fileinfo>::iterator ivfileinfo;
+	//vector<fileinfo>::iterator ivfileinfo;
 	vector<bigfile>::iterator ivbigfile;
-	list<smallfile>::iterator ilsmallfile;
+//	list<smallfile>::iterator ilsmallfile;
 	int c= 0;
 	while(1)
 	{
@@ -90,6 +89,7 @@ void MTFSop::dataInit(void *s)
 			vector<int>::iterator ivd;
 			int dcount;
 			string key;
+			vector<string>::iterator idindex;
 			for(i = 0; i < linenum; i++)
 			{
 				line = "";
@@ -97,12 +97,11 @@ void MTFSop::dataInit(void *s)
 				int comapos1 = 0, comapos2 = 0;
 				int x = 0;
 				dcount = 0;
-				for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++) //对每行中的每个属性
+				for(idindex = (*im_vtableInfo).dindex.begin(); idindex != (*im_vtableInfo).dindex.end(); idindex++) //对每行中的每个属性
 				{	
-					
 					comapos2 = line.find(',',comapos1);
 					linetmp = line.substr(comapos1, comapos2 - comapos1);			
-					int type = (*idlist).maptype;
+					int type = (*im_vtableInfo).dlist[*idindex].maptype;
 					comapos1 = comapos2 + 1;
 					switch(type)
 					{
@@ -120,15 +119,15 @@ void MTFSop::dataInit(void *s)
 							{
 								n = 0;
 							}
-							ii1 = (*idlist).vii.begin(); 
-							ii2 = (*idlist).vii.begin() + 1;
+							ii1 = (*im_vtableInfo).dlist[*idindex].vii.begin(); 
+							ii2 = (*im_vtableInfo).dlist[*idindex].vii.begin() + 1; 
 							while(1)
 							{
-								while(n > (*ii1).first && (*ii2).first == (*ii1).first && (ii2 + 1) != (*idlist).vii.end())
+								while(n >= (*ii1).first && (*ii2).first == (*ii1).first && (ii2 + 1) != (*im_vtableInfo).dlist[*idindex].vii.end())
 								{
 									ii2 += 1;
 								}
-								if(n > (*ii2).first && (ii2 + 1) != (*idlist).vii.end())
+								if(n >= (*ii2).first && (ii2 + 1) != (*im_vtableInfo).dlist[*idindex].vii.end())
 								{
 									ii1 = ii2;
 									ii2 += 1;
@@ -138,7 +137,7 @@ void MTFSop::dataInit(void *s)
 							}	
 							min = (*ii1).second;
 							ii3 = ii1;
-							for(; ii1 != ii2; ii1++)
+							for(; ii1 != ii2 + 1; ii1++)
 							{
 								if(min > (*ii1).second)
 								{
@@ -146,7 +145,7 @@ void MTFSop::dataInit(void *s)
 									ii3 = ii1;
 								}
 							}
-							for(xi = 0, ii1 = (*idlist).vii.begin(); ii1 != ii3;xi++, ii1++)
+							for(xi = 0, ii1 = (*im_vtableInfo).dlist[*idindex].vii.begin(); ii1 != ii3;xi++, ii1++)
 							{
 							}
 							xi++;
@@ -168,15 +167,15 @@ void MTFSop::dataInit(void *s)
 							{
 								n = 0;
 							}
-							fi1 = (*idlist).vfi.begin(); 
-							fi2 = (*idlist).vfi.begin() + 1;
+							fi1 = (*im_vtableInfo).dlist[*idindex].vfi.begin(); 
+							fi2 = (*im_vtableInfo).dlist[*idindex].vfi.begin() + 1; 
 							while(1)
 							{
-								while(n > (*fi1).first && (*fi2).first == (*fi1).first && (fi2 + 1) != (*idlist).vfi.end())
+								while(n >= (*fi1).first && (*fi2).first == (*fi1).first && (fi2 + 1) != (*im_vtableInfo).dlist[*idindex].vfi.end())
 								{
 									fi2 += 1;
 								}
-								if(n > (*fi2).first && (fi2 + 1) != (*idlist).vfi.end())
+								if(n >= (*fi2).first && (fi2 + 1) != (*im_vtableInfo).dlist[*idindex].vfi.end())
 								{
 									fi1 = fi2;
 									fi2 += 1;
@@ -186,7 +185,7 @@ void MTFSop::dataInit(void *s)
 							}	
 							min = (*fi1).second;
 							fi3 = fi1;
-							for(; fi1 != fi2; fi1++)
+							for(; fi1 != fi2 + 1; fi1++)
 							{
 								if(min > (*fi1).second)
 								{
@@ -194,7 +193,7 @@ void MTFSop::dataInit(void *s)
 									fi3 = fi1;
 								}
 							}
-							for(xi = 0, fi1 = (*idlist).vfi.begin(); fi1 != fi3;xi++, fi1++)
+							for(xi = 0, fi1 = (*im_vtableInfo).dlist[*idindex].vfi.begin(); fi1 != fi3;xi++, fi1++)
 							{
 							}
 							xi++;
@@ -213,8 +212,8 @@ void MTFSop::dataInit(void *s)
 								n = "";
 							}
 				//			cout << "n:" << n << endl;
-							si1 = (*idlist).vsi.begin(); 
-							si2 = (*idlist).vsi.begin() + 1;
+							si1 = (*im_vtableInfo).dlist[*idindex].vsi.begin(); 
+							si2 = (*im_vtableInfo).dlist[*idindex].vsi.begin() + 1; 
 							while(1)
 							{
 								if(n == "")
@@ -224,11 +223,11 @@ void MTFSop::dataInit(void *s)
 									break;
 								}
 
-								while(n > (*si1).first && (*si2).first == (*si1).first && (si2 + 1) != (*idlist).vsi.end())
+								while(n >= (*si1).first && (*si2).first == (*si1).first && (si2 + 1) != (*im_vtableInfo).dlist[*idindex].vsi.end())
 								{
 									si2 += 1;
 								}
-								if(n >= (*si2).first && (si2 + 1) != (*idlist).vsi.end())
+								if(n >= (*si2).first && (si2 + 1) != (*im_vtableInfo).dlist[*idindex].vsi.end())
 								{
 									si1 = si2;
 									si2 += 1;
@@ -238,7 +237,7 @@ void MTFSop::dataInit(void *s)
 							}	
 							min = (*si1).second;
 							si3 = si1;
-							for(; si1 != si2; si1++)
+							for(; si1 != si2 + 1; si1++)
 							{
 								if(min > (*si1).second)
 								{
@@ -246,7 +245,7 @@ void MTFSop::dataInit(void *s)
 									si3 = si1;
 								}
 							}
-							for(xi = 0, si1 = (*idlist).vsi.begin(); si1 != si3;xi++, si1++)
+							for(xi = 0, si1 = (*im_vtableInfo).dlist[*idindex].vsi.begin(); si1 != si3;xi++, si1++)
 							{
 							}
 							xi++;
@@ -265,7 +264,6 @@ void MTFSop::dataInit(void *s)
 				int cmd, partnum;
 				cmd = x % self->activeSlaves.size() + 1;
 				partnum = x / self->activeSlaves.size();
-		//		cout << "cmd:" << cmd << endl;
 				ss.clear();
 				ss << cmd;
 				ss >> strx;
@@ -275,6 +273,8 @@ void MTFSop::dataInit(void *s)
 				string fname;
 				string fd,tmp;	//fd为这一行数据的坐标，也是小文件坐标
 				string bigfileD;//大文件坐标，即小文件坐标的前几位
+				bigfileD = strx + ".";
+				fd = strx + ".";
 				int count = 0;
 				for(ivd = d.begin(); ivd != d.end(); ivd++)
 				{
@@ -293,94 +293,13 @@ void MTFSop::dataInit(void *s)
 						break;
 					fd += ".";
 				}
-			//	cout << "bigD:" <<  bigfileD << endl;
-		//		cout << "smalld" << fd << endl;
+
 				for(ivbigfile = vbigfile.begin(); ivbigfile != vbigfile.end(); ivbigfile++)		//修改vbigfile
 				{
 					if((*ivbigfile).d == bigfileD)	//找到相同的bigfile
 					{
-					/*	for(ivfileinfo = (*ivbigfile).vfileinfo.begin(); ivfileinfo != (*ivbigfile).vfileinfo.end(); ivfileinfo++)	//大文件中的小文件信息
-						{
-							if((*ivfileinfo).d == fd)	//有相同小文件	
-							{
-								(*ivfileinfo).size++;
-								break;
-							}
-						}
-						if(ivfileinfo == (*ivbigfile).vfileinfo.end())	//无相同小文件
-						{
-							fileinfo fi;
-							fi.d = fd;
-							fi.size = 1;
-							(*ivbigfile).vfileinfo.push_back(fi);
-						}
-					*/	
-						smallfile sma;
-						sma.d = fd;
-						cout << "??" << endl;
-						cout << "begin:" << (*(*ivbigfile).lsmallfile.begin()).d << endl;
-						ilsmallfile = lower_bound((*ivbigfile).lsmallfile.begin(), (*ivbigfile).lsmallfile.end(), &sma);
-						cout << (*ilsmallfile).d << endl;
-						if((*ilsmallfile).d == fd)
-						{
-							cout << "append" << endl;
-							(*ilsmallfile).content.push_back(line);
-						}
-						else if(ilsmallfile != (*ivbigfile).lsmallfile.end()) 
-						{
-						//	ilsmallfile = lower_bound((*ivbigfile).lsmallfile.begin(), (*ivbigfile).lsmallfile.end(), sma);
-							smallfile sm;
-							sm.d = fd;
-							sm.content.push_back(line);
-							cout << "insert" << endl;
-						//	(*ivbigfile).lsmallfile.insert(ilsmallfile, sm);
-							(*ivbigfile).lsmallfile.insert(ilsmallfile, sm);
-							
-						}
-						else if(ilsmallfile == (*ivbigfile).lsmallfile.end()) 
-						{
-							smallfile sm;
-							sm.d = fd;
-							sm.content.push_back(line);
-							cout << "insert" << endl;
-						//	(*ivbigfile).lsmallfile.insert(ilsmallfile, sm);
-							(*ivbigfile).lsmallfile.push_back(sm);
-						}
-
-			/*			for(ilsmallfile = (*ivbigfile).lsmallfile.begin(); ilsmallfile != (*ivbigfile).lsmallfile.end(); ilsmallfile++)	//大文件中的小文件列表
-						{
-							if((*ilsmallfile).d == fd)
-							{
-					//			cout << "pushback" << endl;
-						//		(*((*ivsmallfile).content)).push_back(line);
-								(*ilsmallfile).content.push_front(line);
-								break;
-							}
-							if((*ilsmallfile).d > fd)	//按字典序插入
-							{
-					//			cout << "insert" << endl;
-								smallfile sm;
-								sm.d = fd;
-						//		vector<string> *content = new vector<string>;
-						//		sm.content = content;
-						//		(*(sm.content)).push_back(line);
-							//	(*ivbigfile).vsmallfile.insert(ivsmallfile, sm);
-								sm.content.push_back(line);
-								(*ivbigfile).lsmallfile.insert(ilsmallfile, sm);
-								break;
-							}
-						}
-						if(ilsmallfile == (*ivbigfile).lsmallfile.end())	//在末尾插入
-						{
-		//					cout << "push_back small" << endl;
-							smallfile sm;
-							sm.d = fd;
-					//		vector<string> *content = new vector<string>;
-					//		sm.content = content;
-					//		(*(sm.content)).push_back(line);
-							sm.content.push_back(line);
-							(*ivbigfile).lsmallfile.push_back(sm);
-						}*/
+						(*ivbigfile).msmallfile[fd].push_back(line);    
+						(*ivbigfile).fileinfo[fd]++;    
 						break;
 					}
 				}
@@ -388,23 +307,13 @@ void MTFSop::dataInit(void *s)
 				{
 					bigfile bf;
 					bf.d = bigfileD;
-					fileinfo fi;
-					fi.d = fd;
-					fi.size = 1;
-					smallfile sm;
-					sm.d = fd;
-					sm.content.push_back(line);
-				//	vector<string> *content = new vector<string>;
-				//	sm.content = content;
-				//	(*(sm.content)).push_back(line);
-		//			cout << "smcontent:" << (*(sm.content))[0] << endl;
-	//				sm.content.push_back(line);
-					bf.lsmallfile.push_back(sm);
-					bf.vfileinfo.push_back(fi);
+					bf.fileinfo[fd] = 1;
+					list<string> c;
+					c.push_back(line);
+					bf.msmallfile[fd] = c;
 					vbigfile.push_back(bf);
 					cout << "new big file:" << bigfileD << endl;
 				}
-
 				c++;
 				if(c % 5000 == 0)
 					cout << c << ":" << bigfileD << "    " << fd <<  endl;
@@ -412,29 +321,273 @@ void MTFSop::dataInit(void *s)
 			}
 			string fname;
 			string fpath = "../data/tmp/";
-			im_vtableInfo2 = (self->m_vtableInfo.end()) - 1;
+			im_vtableInfo2 = (self->mt.m_vtableInfo.end()) - 1;
+			map<string, int>::iterator ifileinfo;
+			map<string, list<string> >::iterator imsmallfile;
+			list<string>::iterator icontent;
 			for(ivbigfile = vbigfile.begin(); ivbigfile != vbigfile.end(); ivbigfile++)
 			{
-				fname = fpath + (*im_vtableInfo2).tableName + "." + strx + "." + (*ivbigfile).d;
-				cout << fname << endl;
+				fname = fpath + (*im_vtableInfo2).tableName + "." + (*ivbigfile).d;
+				fstream of;
+				of.open(fname.c_str(), ofstream::out | ofstream::app);
+				of << (*ivbigfile).fileinfo.size() << endl;
+				for(ifileinfo = (*ivbigfile).fileinfo.begin(); ifileinfo != (*ivbigfile).fileinfo.end(); ifileinfo++)
+				{
+					of << (*ifileinfo).first << " " << (*ifileinfo).second << endl;
+				}
+				for(imsmallfile = (*ivbigfile).msmallfile.begin(); imsmallfile != (*ivbigfile).msmallfile.end(); imsmallfile++)
+				{
+					of << (*imsmallfile).first << endl;
+					for(icontent = (*imsmallfile).second.begin(); icontent != (*imsmallfile).second.end(); icontent++)
+					{
+						of << *icontent << endl;
+					}
+				}
+			//	cout << fname << endl;
+				of.close();
 			}
-		/*	vector<tableinfo>::iterator  im_vtableInfo2;
-			im_vtableInfo2 = (self->m_vtableInfo.end()) - 1;
-			vector<mapnode>::iterator idlist;
-			fname = fpath + (*im_vtableInfo2).tableName + "." + strx + "." + fd;
-			ofstream of;
-			of.open(fname.c_str(), ofstream::out | ofstream::app);
-			of << line << endl; 
-			of.close();
-		*/	
-			
+			vbigfile.clear();
 			cout << "FINISH!" << endl;
-			for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
+	/*		for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
 			{
-				
 				cout << (*idlist).dname << endl;
 			}
+	*/		
+			vector<tableinfo>::iterator im_vtableInfo;	//存储该表的元信息
+			map<string, mapnode>::iterator idlist;
+		    stringstream ss;
+	        im_vtableInfo = (self->mt.m_vtableInfo.end()) - 1;
+	        cout << "tablename:" << (*im_vtableInfo).tableName << endl;
+	        cout << "m_vtableInfosize:" << self->mt.m_vtableInfo.size()<< endl;
+	        ofstream ofmeta;
+			filepath = "../data/";
+	        filepath = filepath + "meta/" + (*im_vtableInfo).tableName + ".meta";
+	        cout << filepath << endl;
+	        ofmeta.open(filepath.c_str());
+	        ofmeta << (*im_vtableInfo).confname << endl;	//写入配置文件的名字
+	        ofmeta << (*im_vtableInfo).dlist.size() << endl;//写入维数
+			ofmeta << self->activeSlaves.size() << endl;
+			vector<struct SlaveNode>::iterator iactiveSlaves;
+			for(iactiveSlaves = self->activeSlaves.begin(); iactiveSlaves != self->activeSlaves.end(); iactiveSlaves++)
+			{
+				tableslave ts;
+				ts.ip = (*iactiveSlaves).ip;
+				ofmeta << (*iactiveSlaves).ip << endl;
+				ts.alive = true;
+				(*im_vtableInfo).vtableslave.push_back(ts);
+			}
+			
+			string stype;
+			
+	        for(idindex = (*im_vtableInfo).dindex.begin(); idindex != (*im_vtableInfo).dindex.end(); idindex++)
+	        {
+		        line = *idindex;
+				ss.clear();
+				ss << (*im_vtableInfo).dlist[*idindex].maptype;
+				ss >> stype;
+				line = line + " " + stype;
+		        switch((*im_vtableInfo).dlist[*idindex].maptype)
+		        {
+			        case 10:
+			        case 11:
+			        case 12:
+			        {
+				        vector<pair<int, int> >::iterator ivii;
+				        int num1,num2;
+				        string snum1, snum2;
+				        for(ivii = (*im_vtableInfo).dlist[*idindex].vii.begin(); ivii != (*im_vtableInfo).dlist[*idindex].vii.end(); ivii++)
+				        {
+					        num1 = (*ivii).first;
+							ss.clear();
+					        ss << num1;
+					        ss >> snum1;
+					        ss.clear();
+					        num2 = (*ivii).second;
+					        ss << num2;
+					        ss >> snum2;
+					        ss.clear();
+					        line = line + " " + snum1 + " " + snum2;
+				        }
+				        ofmeta << line << endl;
+				        break;
+			        }
+			        case 20:
+			        {
+				        vector<pair<float, int> >::iterator ivfi;
+				        float fnum;
+				        int inum;
+				        string sfnum, sinum;
+				        for(ivfi = (*im_vtableInfo).dlist[*idindex].vfi.begin(); ivfi != (*im_vtableInfo).dlist[*idindex].vfi.end(); ivfi++)
+				        {
+					        fnum = (*ivfi).first;
+							ss.clear();
+					        ss << fnum;
+					        ss >> sfnum;
+					        ss.clear();
+					        inum = (*ivfi).second;
+					        ss << inum;
+					        ss >> sinum;
+					        line = line + " " + sfnum + " " + sinum;
+				        }
+				        ofmeta << line << endl;
+				        break;
+			        }
+			        case 30:
+			        {
+				        vector<pair<string, int> >::iterator ivsi;
+				        int inum;
+				        string sinum;
+				        for(ivsi = (*im_vtableInfo).dlist[*idindex].vsi.begin(); ivsi != (*im_vtableInfo).dlist[*idindex].vsi.end(); ivsi++)
+				        {
+					        inum = (*ivsi).second;
+							ss.clear();
+					        ss << inum;
+					        ss >> sinum;
+					        line = line + " " + (*ivsi).first + " " + sinum;
+				        }
+				        ofmeta << line << endl;
+				        break;
+			        }
+			        default:
+				        break;
+			    }
+	        }
+	        ofmeta.close();
 			break;
 		}
 	}
+}
+
+void MTFS::MasterDataInit(void *s)
+{
+	Master* self = (Master*)s;
+	vector<string> filename;
+	trave_dir("../data/meta", filename);
+	
+	vector<string>::iterator ifilename;
+	vector<tableinfo>::iterator im_vtableInfo, im_vtableInfo2;
+	map<string, mapnode>::iterator idlist;
+	vector<pair<string, int> >::iterator ivsi;
+	vector<pair<int, int> >::iterator ivii;
+	vector<pair<float, int> >::iterator ivfi;
+	stringstream ss;
+	int i, slavenum;
+	string line, word, stype;
+	for(ifilename = filename.begin(); ifilename != filename.end(); ifilename++)
+	{
+		tableinfo table;
+		ifstream ifile;
+		string path = "../data/meta/" + *ifilename;
+		string confname, snum;
+		int dnum, lnum;
+		ifile.open(path.c_str());
+		table.tableName = (*ifilename).substr(0, (*ifilename).find("."));
+		ifile >> confname;
+		ifile >> snum;
+		ss.clear();
+		ss << snum;
+		ss >> dnum;
+		table.confname = confname;
+
+		ifile >> slavenum;
+		for(i = 0; i < slavenum; i++)
+		{
+			tableslave ts;
+			ifile >> ts.ip;
+			ts.alive = false;
+			table.vtableslave.push_back(ts);
+		}
+
+		for(i = 0; i < dnum; i++)
+		{
+		    string tablename;
+			mapnode mn;
+			getline(ifile, line);
+			istringstream stream(line);
+			stream >> tablename;
+			stream >> stype;
+			ss.clear();
+			ss << stype;
+			ss >> mn.maptype;
+			switch(mn.maptype)
+			{
+				case 10:	
+				case 11:	
+				case 12:
+				{
+					while(stream >> word)
+					{
+						int n;
+						stream >> snum;
+						ss.clear();
+						ss << word;
+						ss >> n;
+						ss.clear();
+						ss << snum;
+						ss >> lnum;
+						mn.vii.push_back(make_pair(n, lnum));
+					}
+					break;
+				}
+				case 20:
+				{
+					while(stream >> word)
+					{
+						float f;
+						stream >> snum;
+						ss.clear();
+						ss << word;
+						ss >> f;
+						ss.clear();
+						ss << snum;
+						ss >> lnum;
+						mn.vfi.push_back(make_pair(f, lnum));
+					}
+					break;
+				}
+				case 30:
+				{
+					while(stream >> word)
+					{
+						stream >> snum;
+						ss.clear();
+						ss << snum;
+						ss >> lnum;
+						mn.vsi.push_back(make_pair(word, lnum));
+					}
+					break;
+				}
+				default:
+					break;
+			}
+			table.dlist.insert(make_pair(tablename, mn));
+		}
+		self->mt.m_vtableInfo.push_back(table);
+	}
+}
+
+int MTFS::trave_dir(char* path, vector<string> &filename)
+{
+    DIR *d = opendir(path); //声明一个句柄
+    struct dirent *file = NULL; //readdir函数的返回值就存放在这个结构体中
+    struct stat sb;    
+    string f;
+    if(!d)
+    {
+        printf("error opendir %s!!!\n",path);
+        return -1;
+    }
+    while((file = readdir(d)) != NULL)
+    {
+        //把当前目录.，上一级目录..及隐藏文件都去掉，避免死循环遍历目录
+        if(strncmp(file->d_name, ".", 1) == 0)
+            continue;
+		f = file->d_name;
+		filename.push_back(f);      
+    }
+    closedir(d);
+	return 0;
+}
+void readData(void *s)
+{
 }

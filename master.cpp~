@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <sstream>
 #include <fstream>
+#include "MTFS.h"
 
 using namespace std;
 int n = 0;
@@ -35,58 +36,6 @@ int Master::init()
 	outCmdPort = 53001;
 	m_itasknum = 0;
 	m_isockcount = 0;
-	
-	//MTFS mtfs;
-	mt.MasterDataInit(this); //调用MTFS来做数据划分
-	vector<tableinfo>::iterator im_vtableInfo, im_vtableInfo2;
-	map<string, mapnode>::iterator idlist;
-	vector<pair<string, int> >::iterator ivsi;
-	vector<pair<int, int> >::iterator ivii;
-	vector<pair<float, int> >::iterator ivfi;
-	for(im_vtableInfo = mt.m_vtableInfo.begin(); im_vtableInfo != mt.m_vtableInfo.end(); im_vtableInfo++)
-	{
-		cout << "tablename: " << (*im_vtableInfo).tableName << endl;
-		cout << "dnum: " << (*im_vtableInfo).dlist.size() << endl;
-		for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
-		{
-			cout << (*idlist).first << " ";
-			switch((*idlist).second.maptype)
-			{
-				case 10:
-				case 11:
-				case 12:
-				{
-					for(ivii = (*idlist).second.vii.begin(); ivii != (*idlist).second.vii.end(); ivii++)
-					{
-						cout << (*ivii).first << " " << (*ivii).second << " ";
-					}
-					cout << endl;
-					break;
-				}
-				case 20:
-				{
-					for(ivfi = (*idlist).second.vfi.begin(); ivfi != (*idlist).second.vfi.end(); ivfi++)
-					{
-						cout << (*ivfi).first << " " << (*ivfi).second << " ";
-					}
-					cout << endl;
-					break;
-				}
-				case 30:
-				{
-					for(ivsi = (*idlist).second.vsi.begin(); ivsi != (*idlist).second.vsi.end(); ivsi++)
-					{
-						cout << (*ivsi).first << " " << (*ivsi).second << " ";
-					}
-					cout << endl;
-					break;
-				}
-				default:
-					break;
-			}
-		}
-	}
-
     return 0;
 }
 
@@ -368,11 +317,11 @@ void* Master::jobDealer(void*s)
 						pthread_join(pgetPartition, &exit);		
 						sleep(1);
 					}
-					pthread_t pdatasplit;
-					pthread_create(&pdatasplit, NULL, dataSplit, self);
+					pthread_t pdatainit;
+					pthread_create(&pdatainit, NULL, dataInit, self);
 					void* exit = (int*)malloc(4);
 					//	pthread_detach(pgetSysinfo);
-					pthread_join(pdatasplit, &exit);		
+					pthread_join(pdatainit, &exit);		
 				
 					break;
 				}
@@ -392,26 +341,9 @@ void* Master::jobDealer(void*s)
 					}
 					break;
 				}
-	/*			case 5:
-				{
-					for(iTCPInfo = vTCPInfo.begin(); iTCPInfo != vTCPInfo.end(); iTCPInfo++)
-					{
-						cout <<  "in 5" << endl;
-						cout << (*iTCPInfo).server->m_sock << endl;
-						TCPInfo tinfo = *iTCPInfo;
-						pthread_t ptestget;
-						pthread_create(&ptestget, NULL, getdata, &tinfo);
-						void* exit = (int*)malloc(4);
-					//	pthread_detach(pgetSysinfo);
-						pthread_join(ptest, &exit);		
-						sleep(1);
-					}
-					break;
-				}*/
 				default:
 					break;
 			}
-			
 			if(self->m_qmasterjobList.front().j_Status == 1)
 				self->m_qmasterjobList.front().j_Status = 2;
 			vector<slaveJob>::iterator islavejob;
@@ -514,20 +446,6 @@ void* Master::Shell(void *s)
 				}
 				self->m_qmasterjobList.push(j);
 			}
-			else if("gettest" == word)
-			{
-				self->m_itasknum++;
-				job j;
-				vector<slaveJob>::iterator ij;
-				for(ij = self->m_jobList.begin(); ij != self->m_jobList.end(); ij++)
-				{
-					j.jobtype = 5;
-					j.j_Status = 0;
-					(*ij).slaveJobList.push(j);
-					cout << "sending to slaves:" << (*ij).slave << endl;
-				}
-				self->m_qmasterjobList.push(j);
-			}
 			else if("showjob" == word)
 			{
 				vector<slaveJob>::iterator islavejob;
@@ -548,21 +466,6 @@ void* Master::Shell(void *s)
 				stream >> filename;
 				stream >> fileconf;
 				tableinfo table;
-				
-				bool gout = false;
-				vector<tableinfo>::iterator im_vtableInfo;
-				for(im_vtableInfo = self->mt.m_vtableInfo.begin(); im_vtableInfo != self->mt.m_vtableInfo.end(); im_vtableInfo++)
-				{
-					if((*im_vtableInfo).tableName == tablename)
-					{
-						cout << tablename << " is used!" << endl;
-						gout = true;
-						break;
-					}
-				}
-				if(gout)
-					continue;
-
 				table.filename = filename;
 				table.confname = fileconf;
 				table.tableName = tablename;
@@ -602,12 +505,13 @@ void* Master::Shell(void *s)
 					table.dindex.push_back(dname);
 					table.dcnum.push_back(dcnum);
 					mapnode mn;
+					mn.dname = dname;
 					int idtype;
 					stringstream s;
 					s << dtype;
 					s >> idtype;
 					mn.maptype = idtype;
-					table.dlist.insert(make_pair(dname, mn));
+					table.dlist.push_back(mn);
 
 					stringstream ss;
 					string index;
@@ -631,7 +535,7 @@ void* Master::Shell(void *s)
 					vtmpfile.push_back(of);
 				}
 				
-				self->mt.m_vtableInfo.push_back(table);
+				self->m_vtableInfo.push_back(table);
 				
 				string line;
 				int count = 0;
@@ -678,8 +582,6 @@ void* Master::Shell(void *s)
 					system(cmd.c_str());
 					iactiveSlaves++;
 				}
-				string cmd = "rm ../data/tmp/*";
-				system(cmd.c_str());
 				for(ivtmpfile = vtmpfile.begin(); ivtmpfile != vtmpfile.end(); ivtmpfile++)
 				{
 					delete *ivtmpfile;
@@ -694,7 +596,7 @@ void* Master::Shell(void *s)
 					(*ij).slaveJobList.push(j);
 					cout << "sending to slaves:" << (*ij).slave << endl;
 				}
-				cout << "dcnumsize:" << (*((self->mt.m_vtableInfo.end())-1)).dcnum.size() << endl;
+				cout << "dcnumsize:" << (*((self->m_vtableInfo.end())-1)).dcnum.size() << endl;
 				self->m_qmasterjobList.push(j);
 				//	self->m_itasknum++;
 				
@@ -773,7 +675,6 @@ void* Master::test(void* s)
 	ServerSocket server = (*self->server);
 	string text, t;
 	server >> text;
-	server << text;
 	
 	cout << "test:" << text << endl;
 	queue<job>* pslaveJob = (queue<job>*)malloc(16);
@@ -809,29 +710,30 @@ void* Master::getPartition(void* s)
 	stringstream ss;
 	ss << recvtimes;
 	ss >> recvt;
-	ss.clear();
-
+	
 	vector<tableinfo>::iterator im_vtableInfo;
-	for(im_vtableInfo = self->m->mt.m_vtableInfo.begin(); im_vtableInfo != self->m->mt.m_vtableInfo.end(); im_vtableInfo++)
+	for(im_vtableInfo = self->m->m_vtableInfo.begin(); im_vtableInfo != self->m->m_vtableInfo.end(); im_vtableInfo++)
 	{
 		if((*im_vtableInfo).tableName == tablename)
 			break;
 	}
 	
-	map<string, mapnode>::iterator idlist;
+	vector<mapnode>::iterator idlist;
 	for(i = 0; i < recvt; i++)
 	{
 		string dname;
 		server >> dname;
 		server << "?";
 		int count = 0;
-	/*	for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
+		for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
 		{
 			count++;
 			if((*idlist).dname == dname)
 				break;
 		}
-*/
+	//	mapnode mn;
+	//	mn.dname = dname;
+
 		string smaptype;
 		int imaptype;
 		ss.clear();
@@ -839,8 +741,8 @@ void* Master::getPartition(void* s)
 		server << "?";
 		ss << smaptype;
 		ss >> imaptype;
-		(*im_vtableInfo).dlist[dname].maptype = imaptype;
-	//	(*idlist).maptype = imaptype;
+	//	mn.maptype = imaptype;
+		(*idlist).maptype = imaptype;
 		switch(imaptype)
 		{
 			case 10:
@@ -865,12 +767,11 @@ void* Master::getPartition(void* s)
 					ss << srec;
 					ss >> rec;
 					//(*idlist).mii.insert(make_pair(rec, 0));
-					(*im_vtableInfo).dlist[dname].vii.push_back(make_pair(rec, 0));
+					(*idlist).vii.push_back(make_pair(rec, 0));
 				}
-				cout << "int finish" << endl;
 	//			(*im_vtableInfo).dlist.push_back(mn);
 				break;
-			}		
+			}
 			case 20:
 			{
 				ss.clear();
@@ -891,7 +792,7 @@ void* Master::getPartition(void* s)
 					ss << srec;
 					ss >> rec;
 				//	(*idlist).mfi.insert(make_pair(rec, 0));
-					(*im_vtableInfo).dlist[dname].vfi.push_back(make_pair(rec, 0));
+					(*idlist).vfi.push_back(make_pair(rec, 0));
 				}
 	//			(*im_vtableInfo).dlist.push_back(mn);
 				break;
@@ -911,13 +812,13 @@ void* Master::getPartition(void* s)
 				cout << "pos:" << count << endl;
 				for(j = 0; j < dcnum; j++)
 				{
-			//		ss.clear();
+					ss.clear();
 					server >> srec;
 					server << ">>";
-			//		ss << srec;
+					ss << srec;
 			//		cout << srec << endl;
 					//(*idlist).msi.insert(make_pair(srec, 0));
-					(*im_vtableInfo).dlist[dname].vsi.push_back(make_pair(srec, 0));
+					(*idlist).vsi.push_back(make_pair(srec, 0));
 				}
 	//			(*im_vtableInfo).dlist.push_back(mn);
 				break;
@@ -943,159 +844,385 @@ void* Master::getPartition(void* s)
 //	free(pslaveJob);
 }
 
-void* Master::dataSplit(void* s)
+
+void* Master::dataInit(void* s)
 {
 	Master* self = (Master*)s;
-	self->mt.dataSplit(self); //调用MTFS来做数据划分
-	
-	vector<struct SlaveNode>::iterator iactiveSlaves;
-	vector<string> filename;
-	vector<string>::iterator ifilename;
-	map<string, vector<string> > splitfilename;
-	map<string, vector<string> >::iterator isplitfilename;
-	self->trave_dir("../data/tmp", filename);
-	
-	int p1, p2;
-	string tablename = *(filename.begin());
-	p1 = tablename.find(".");
-	tablename = tablename.substr(0, p1);
-
-	for(ifilename = filename.begin(); ifilename != filename.end(); ifilename++)
-	{
-	//	cout << *ifilename << endl;
-		string slaveno = *ifilename;
-		p1 = slaveno.find(".");
-		p2 = slaveno.find(".", p1 + 1);
-		slaveno = slaveno.substr(p1 + 1, p2 - p1 - 1);
-		cout << slaveno << endl;
-		splitfilename[slaveno].push_back(*ifilename);
-	}
-	
-	string base, username;
-	self->cr.getSlaveList("slaves", base, username, self->slave_list);
-	string no;
-	int i = 1;
+	MTFSop MTFS;
+	MTFS.dataInit(self);
+/*	vector<tableinfo>::iterator  im_vtableInfo;
+	im_vtableInfo = (self->m_vtableInfo.end()) - 1;
+	vector<mapnode>::iterator idlist;
+	cout << "in datainit!!!" << endl;
 	stringstream ss;
-	for(iactiveSlaves = self->activeSlaves.begin(); iactiveSlaves != self->activeSlaves.end(); iactiveSlaves++, i++)
+	while(1)
 	{
-		ss.clear();
-		ss << i;
-		ss >> no;
-		sendfileinfo sf;
-		sf.ip = (*iactiveSlaves).ip;
-		sf.num = no;
-		sf.base = base;
-		sf.tablename = tablename;
-		sf.username = username;
-		sf.filename = splitfilename[no];
-//		for(ifilename = sf.filename.begin(); ifilename != sf.filename.end(); ifilename++)
-//			cout << *ifilename << endl;
-		pthread_t psenddata;
-		pthread_create(&psenddata, NULL, senddata, &sf);
-		void* exit = (int*)malloc(4);
-		pthread_join(psenddata, &exit);
-	}
-}
-
-void* Master::senddata(void* s)
-{
-	sendfileinfo *self = (sendfileinfo*)s;
-	vector<string>::iterator ifilename;
-	string filepath = "../data/tmp/";
-	for(ifilename = self->filename.begin(); ifilename != self->filename.end(); ifilename++)
-	{
-		string cmd = (string("scp -P 13022 -r ") + filepath + (*ifilename) + " " + self->username + "@" + self->ip + ":" + self->base  + "/data/" + self->tablename +  "/" + *ifilename);
-		system(cmd.c_str());
-		system(("rm " + filepath + (*ifilename)).c_str());
-	}
-
-}
-
-int Master::trave_dir(char* path, vector<string> &filename)
-{
-    DIR *d = opendir(path); //声明一个句柄
-    struct dirent *file = NULL; //readdir函数的返回值就存放在这个结构体中
-    struct stat sb;    
-    string f;
-    if(!d)
-    {
-        printf("error opendir %s!!!\n",path);
-        return -1;
-    }
-    while((file = readdir(d)) != NULL)
-    {
-        //把当前目录.，上一级目录..及隐藏文件都去掉，避免死循环遍历目录
-        if(strncmp(file->d_name, ".", 1) == 0)
-            continue;
-		f = file->d_name;
-		filename.push_back(f);      
-    }
-    closedir(d);
-    return 0;
-}
-/*
-void Master::decode(vector<string> c)
-{
-	vector<string>::iterator ic;
-	vector<tableinfo>::iterator im_vtableInfo, im_vtableInfo2;
-	vector<pair<string, int> >::iterator ivsi;
-	vector<pair<int, int> >::iterator ivii;
-	vector<pair<float, int> >::iterator ivfi;
-	string tablename;
-	string attrname;
-	string relation;
-	string value;
-	for(ic = c.begin(); ic != c.end; ic++)
-	{
-		istringstream stream(line);
-		stream >> tablename;
-		for(im_vtableInfo = mt.m_vtableInfo.begin(); im_vtableInfo != mt.m_vtableInfo.end(); im_vtableInfo++)
+		if((*im_vtableInfo).dlist.size() == (*im_vtableInfo).dcnum.size())
 		{
-			if(tablename == (*im_vtableInfo).tableName)
+			ifstream  infile, inconf;
+			string filepath = "../data/";
+			infile.open((filepath + (*im_vtableInfo).filename).c_str());
+			if(!infile)
 			{
-				break;
+				cout << "cannot open file " << (*im_vtableInfo).filename << "!" << endl;
+				continue;
 			}
-		}
-		if(im_vtableInfo == mt.m_vtableInfo.end())
-			cout << "no such table!" << endl;
-		
-		do
-		{
-			stream >> attrname;
-			stream >> relation;
-			stream >> value;
-		}while()
+			inconf.open((filepath + (*im_vtableInfo).confname).c_str());
+			if(!inconf)
+			{
+				cout << "cannot open fileconf " << (*im_vtableInfo).confname << "!" << endl;
+				continue;
+			}
+			int linenum, dnum, i;
+			string sline, sdnum;
+			//inconf >> linenum >> dnum;
+			getline(inconf, sline);
+			getline(inconf, sdnum);
+			ss.clear();
+			ss << sline;
+			ss >> linenum;
+			ss.clear();
+			ss << sdnum;
+			ss >> dnum;
+			string pos;
+			string line;
+			vector<int> vpos;
+			vector<int>::iterator ivpos;
+			int ipos;
+		//	cout << linenum << " " << dnum << endl;
+			line = "";
+			getline(inconf,line);
+			//cout << "line:" << line << endl;
+			istringstream stream(line);
+			vector<splitfile> sp;
+			vector<splitfile>::iterator isp;
+			while(stream >> pos)	//获取切分位置
+			{
+				ss.clear();
+				ss << pos;
+				ss >> ipos;
+			//	cout << ipos << endl;
+				vpos.push_back(ipos);
+			}
+			for(ivpos = vpos.begin(); ivpos != vpos.end();ivpos++)	//除第一个外，每个都多ID
+			{
+				if(ivpos != vpos.begin())
+					(*ivpos)++;
+			}
+			ivpos = vpos.begin();
+			string linetmp;
+			line = "";
+			getline(infile,line);
+		//	cout << line << endl;
+			vector<int> d;
+			vector<int>::iterator ivd;
+			int dcount;
+			int keynum;
+			string key;
+			for(i = 0; i < linenum; i++)
+			{
+				int c = 0;
+				string num;
+				for(ivpos = vpos.begin(); ivpos != vpos.end();ivpos++)
+				{
+					c++;
+					ss.clear();
+					ss << c;
+					ss >> num;
+					splitfile spx;
+				//	cout << "num:" << num << endl;
+					spx.x = 0;
+					spx.dnum = num;
+					sp.push_back(spx);
+				}
+				line = "";
+				getline(infile,line);
+				int comapos1 = 0, comapos2 = 0;
+				int x = 0;
+				keynum = 0;	
+				dcount = 0;
+				isp = sp.begin();
+				ivpos = vpos.begin();
+				for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
+				{	
+					
+					comapos2 = line.find(',',comapos1);
+					linetmp = line.substr(comapos1, comapos2 - comapos1);			
+				//	cout << linetmp << endl;
+					int type = (*idlist).maptype;
+					if(dcount == *ivpos)	// 开启新的一段
+					{
+						dcount = 1;	
+						ivpos++;
+						isp++;
+						if(isp != sp.end())
+						{
+							(*isp).line = key;
+							(*isp).xi.push_back(keynum); 
+							(*isp).x = keynum;
+						}
+					}
+					dcount++;
+				//	cout << "dcount:" << dcount << endl;
+					comapos1 = comapos2 + 1;
+					switch(type)
+					{
+						case 10:
+					case 11:
+						case 12:
+						{
+							int n, min, xi;
+							vector<pair<int, int> >::iterator ii1, ii2, ii3;
+							ss.clear();
+							ss << linetmp;
+							ss >> n;
+							if(idlist == (*im_vtableInfo).dlist.begin())
+							{
+								key = linetmp;
+								(*isp).line = linetmp;
+							}
+							else
+							{
+								(*isp).line = (*isp).line +  "," + linetmp;
+							}
 
+							if(comapos1 == comapos2)
+							{
+								n = 0;
+							}
+							ii1 = (*idlist).vii.begin(); 
+							ii2 = (*idlist).vii.begin() + 1;
+							while(1)
+							{
+								while(n > (*ii1).first && (*ii2).first == (*ii1).first && (ii2 + 1) != (*idlist).vii.end())
+								{
+									ii2 += 1;
+								}
+								if(n > (*ii2).first && (ii2 + 1) != (*idlist).vii.end())
+								{
+									ii1 = ii2;
+									ii2 += 1;
+								}
+								else 
+									break;
+							}	
+							min = (*ii1).second;
+							ii3 = ii1;
+							for(; ii1 != ii2; ii1++)
+							{
+								if(min > (*ii1).second)
+								{
+									min = (*ii1).second;
+									ii3 = ii1;
+								}
+							}
+							for(xi = 0, ii1 = (*idlist).vii.begin(); ii1 != ii3;xi++, ii1++)
+							{
+							}
+							xi++;
+							(*ii3).second += 1;
+				//			cout << "count:" << (*ii3).second << endl;
+							x += xi;
+							d.push_back(xi);
+							keynum = xi;
+							(*isp).xi.push_back(xi);
+							(*isp).x += xi;
+							break;
+						}
+						case 20:
+						{
+							float n;
+							int xi, min;
+							vector<pair<float, int> >::iterator fi1, fi2, fi3;
+							ss.clear();
+							ss << linetmp;
+							ss >> n;
+							if(comapos1 == comapos2)
+							{
+								n = 0;
+							}
+							fi1 = (*idlist).vfi.begin(); 
+							fi2 = (*idlist).vfi.begin() + 1;
+							while(1)
+							{
+								while(n > (*fi1).first && (*fi2).first == (*fi1).first && (fi2 + 1) != (*idlist).vfi.end())
+								{
+									fi2 += 1;
+								}
+								if(n > (*fi2).first && (fi2 + 1) != (*idlist).vfi.end())
+								{
+									fi1 = fi2;
+									fi2 += 1;
+								}
+								else 
+									break;
+							}	
+							(*isp).line = (*isp).line +  "," + linetmp;
+							min = (*fi1).second;
+							fi3 = fi1;
+							for(; fi1 != fi2; fi1++)
+							{
+								if(min > (*fi1).second)
+								{
+									min = (*fi1).second;
+									fi3 = fi1;
+								}
+							}
+							for(xi = 0, fi1 = (*idlist).vfi.begin(); fi1 != fi3;xi++, fi1++)
+							{
+							}
+							xi++;
+							(*fi3).second += 1;
+							x += xi;
+							d.push_back(xi);
+							(*isp).xi.push_back(xi);
+							(*isp).x += xi;
+							break;
+						}
+						case 30:
+						{
+							string n = linetmp;
+							int xi, min;
+							vector<pair<string, int> >::iterator si1, si2, si3;
+							if(comapos1 == comapos2)
+							{
+								n = "";
+							}
+							(*isp).line = (*isp).line +  "," + linetmp;
+				//			cout << "n:" << n << endl;
+							si1 = (*idlist).vsi.begin(); 
+							si2 = (*idlist).vsi.begin() + 1;
+							while(1)
+							{
+								if(n == "")
+								{
+									while((*si2).first == "")
+										si2++;
+									break;
+								}
 
-	}
-}
-
-void* Master::getData(void *s)
-{
-	TCPInfo* self = (TCPInfo*)s;
-	vector<string> c;
-
-	c.push_back("f COUNTRY = GE and GYEAR > 1980");
-
-
-	ServerSocket socket = *(self->server);
-	socket >> sysinfo; 
-	socket << "???";
-	socket >> s2; 
-	cout << "master " << self->ip << " sysinfo:" << sysinfo << endl;
-	queue<job>* pslaveJob = (queue<job>*)malloc(16);
-	vector<slaveJob>::iterator ij;
-	::close((*(self->server)).m_sock);
-	::shutdown((*(self->server)).m_sock,2);
-	for(ij = self->m->m_jobList.begin(); ij != self->m->m_jobList.end(); ij++)
-	{
-		if((*ij).slave == self->ip)		//找到该slave的job队列
-		{
-			pslaveJob = &(*ij).slaveJobList;
-			pslaveJob->front().j_Status = 3;
+								while(n > (*si1).first && (*si2).first == (*si1).first && (si2 + 1) != (*idlist).vsi.end())
+								{
+									si2 += 1;
+								}
+								if(n >= (*si2).first && (si2 + 1) != (*idlist).vsi.end())
+								{
+									si1 = si2;
+									si2 += 1;
+								}
+								else 
+									break;
+							}	
+							min = (*si1).second;
+							si3 = si1;
+							for(; si1 != si2; si1++)
+							{
+								if(min > (*si1).second)
+								{
+									min = (*si1).second;
+									si3 = si1;
+								}
+							}
+							for(xi = 0, si1 = (*idlist).vsi.begin(); si1 != si3;xi++, si1++)
+							{
+							}
+							xi++;
+							(*si3).second += 1;
+							x += xi;
+							d.push_back(xi);
+							(*isp).xi.push_back(xi);
+							(*isp).x += xi;
+							break;
+						}
+						default:
+							break;
+					}
+				}
+//				cout << x << endl;
+				vector<int>::iterator ixi;
+				string fpath = "../data/tmp/";
+				for(isp = sp.begin(); isp != sp.end(); isp++)
+				{
+				//	cout << (*isp).line << endl;
+					string strx, strpartnum;
+					int cmd, partnum;
+					cmd = (*isp).x % self->activeSlaves.size() + 1; //slave号
+					partnum = (*isp).x / self->activeSlaves.size();	//
+				//	cout << "cmd:" << cmd << endl;
+					ss.clear();
+					ss << cmd;
+					ss >> strx;
+					ss.clear();
+					ss << x;
+					ss >> strpartnum;
+					string fname;
+					string fd,tmp;
+					for(ixi = (*isp).xi.begin(); ixi != (*isp).xi.end(); ixi++)
+					{
+						ss.clear();
+						ss << *ixi;
+						ss >> tmp;
+						fd += tmp;
+						if(ixi + 1 == (*isp).xi.end())
+							break;
+						fd += ".";
+					}
+				//	cout << "fd:" << fd << endl;
+					vector<tableinfo>::iterator  im_vtableInfo2;
+					im_vtableInfo2 = (self->m_vtableInfo.end()) - 1;
+					vector<mapnode>::iterator idlist;
+					fname = fpath + (*im_vtableInfo2).tableName + "." + strx + "." + (*isp).dnum + "." + fd;
+				//	cout << fname << endl;
+					ofstream of;	
+					of.open(fname.c_str(), ofstream::out | ofstream::app);
+					of << (*isp).line << endl; 
+					of.close();
+				}
+				d.clear();
+				sp.clear();
+//				
+				string strx, strpartnum;
+				int cmd, partnum;
+				cmd = x % self->activeSlaves.size() + 1;
+				partnum = x / self->activeSlaves.size();
+		//		cout << "cmd:" << cmd << endl;
+				ss.clear();
+				ss << cmd;
+				ss >> strx;
+				ss.clear();
+				ss << x;
+				ss >> strpartnum;
+				string fname;
+				string fd,tmp;
+				for(ivd = d.begin(); ivd != d.end(); ivd++)
+				{
+					ss.clear();
+					ss << *ivd;
+					ss >> tmp;
+					fd += tmp;
+					if(ivd + 1 == d.end())
+						break;
+					fd += ".";
+				}
+				d.clear();
+				string fpath = "../data/tmp/";
+				vector<tableinfo>::iterator  im_vtableInfo2;
+				im_vtableInfo2 = (self->m_vtableInfo.end()) - 1;
+				vector<mapnode>::iterator idlist;
+				fname = fpath + (*im_vtableInfo2).tableName + "." + strx + "." + fd;
+				ofstream of;
+				of.open(fname.c_str(), ofstream::out | ofstream::app);
+				of << line << endl; 
+				of.close();
+*/
+		/*
+			cout << "FINISH!" << endl;
+			for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
+			{
+				
+				cout << (*idlist).dname << endl;
+			}
 			break;
 		}
-	}
-	free(pslaveJob);
+	}*/
 }
-*/

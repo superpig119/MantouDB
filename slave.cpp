@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <fstream>
 #include <algorithm>
+#include "MTFS.h"
 
 using namespace std;
 
@@ -238,6 +239,7 @@ void* Slave::test(void* s)
 	string  str = "testsuccess!";
 	str += self->localAddress;
 	client << str;
+	client >> str;
 	::close(client.m_sock);
 	::shutdown(client.m_sock, 2);
 	self->m_jobList.front().j_Status = 2;
@@ -276,6 +278,7 @@ void* Slave::partition(void* s)
 	infileFormer >> t;
 	//getline(infileFormer, t);
 	client  << t;	//传回表名
+	system(("mkdir ./mantouDB/data/" + t).c_str());
 	
 	client >> str;
 	string fnum;
@@ -384,13 +387,13 @@ void* Slave::partition(void* s)
 					client >> str;
 					index += step;
 				}
-				ofstream of;
+	/*			ofstream of;
 				of.open(("./mantouDB/mantouDB/data/" + dname).c_str(), fstream::out);
 				for(ivLONG = vLONG.begin(); ivLONG != vLONG.end(); ivLONG++)
 				{
 					of << *ivLONG << endl;
 				}
-
+*/
 
 				break;
 			}
@@ -422,13 +425,13 @@ void* Slave::partition(void* s)
 					client >> str;
 					index += step;
 				}
-				ofstream of;
+/*				ofstream of;
 				of.open(("./mantouDB/mantouDB/data/" + dname).c_str(), fstream::out);
 				for(ivINT = vINT.begin(); ivINT != vINT.end(); ivINT++)
 				{
 					of << *ivINT << endl;
 				}
-
+*/
 				break;
 			}
 			case 20:	//float
@@ -459,13 +462,13 @@ void* Slave::partition(void* s)
 					client >> str;
 					index += step;
 				}
-				ofstream of;
+/*				ofstream of;
 				of.open(("./mantouDB/mantouDB/data/" + dname).c_str(), fstream::out);
 				for(ivFLOAT = vFLOAT.begin(); ivFLOAT != vFLOAT.end(); ivFLOAT++)
 				{
 					of << *ivFLOAT << endl;
 				}
-
+*/
 				break;
 			} 
 			case 30:	//小范围str
@@ -496,20 +499,19 @@ void* Slave::partition(void* s)
 					client >> str;
 					index += step;
 				}
-				ofstream of;
+/*				ofstream of;
 				of.open(("./mantouDB/mantouDB/data/" + dname).c_str(), fstream::out);
 				for(ivSTR = vSTR.begin(); ivSTR != vSTR.end(); ivSTR++)
 				{
 					of << *ivSTR << endl;
 				}
-
+*/
 				break;
 			}
 			default: 
 				break;
 		}
-	//	system("rm ./mantouDB/data/tmp/*");
-		
+		system(("rm " + path).c_str());
 	}
 	self->m_jobList.front().j_Status = 2;
 	::close(client.m_sock);
@@ -538,4 +540,9 @@ int Slave::trave_dir(char* path, vector<string> &filename)
     closedir(d);
     return 0;
 }
-
+/*
+void* Slave::readData(void *s)
+{
+	Slave *self = (Slave*)s;
+	
+}*/

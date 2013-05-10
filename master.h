@@ -9,6 +9,9 @@
 #include <queue>
 #include "simplesocket/ServerSocket.h"
 #include "simplesocket/SocketException.h"
+#include <dirent.h>
+#include <sys/stat.h>
+#include "MTFS.h"
 
 using namespace std;
 
@@ -52,28 +55,6 @@ typedef struct slavejob0
 	queue<job> slaveJobList;
 }slaveJob;
 
-typedef struct MAPNODE
-{
-	string dname;
-	int maptype; //作为选择下面三种映射的依据
-	vector<pair<string, int> > vsi;
-	vector<pair<int, int> > vii;
-	vector<pair<float, int> > vfi;
-
-//	multimap<string, int> msi;
-//	multimap<int, int> mii;
-//	multimap<float, int> mfi;
-}mapnode;
-
-typedef struct TABLEINFO
-{
-	string filename;
-	string confname;
-	string tableName;
-	vector<string> dindex;
-	vector<mapnode> dlist;
-	vector<int> dcnum; //每一维每一slave上的划分数
-}tableinfo;
 
 typedef struct SPLITFILE
 {
@@ -83,6 +64,16 @@ typedef struct SPLITFILE
 	int x;
 }splitfile;
 
+typedef struct SENDFILEINFO	//将划分完成的文件传送给slave时用到的结构
+{
+	Master *m;
+	string ip;
+	string num;
+	string username;
+	string tablename;
+	string base;
+	vector<string> filename;
+}sendfileinfo;
 
 class Master
 {
@@ -107,17 +98,19 @@ public:
 	static void* jobChecker(void *s);
 	static void* getPartition(void *s);
 	static void* test(void *s);
-	static void* dataInit(void* s);
+	static void* dataSplit(void* s);
+	static void* senddata(void* s);
+	int trave_dir(char* path, vector<string> &filename);
 //	void dataInit();
 public:
 	enum Status {INIT, RUNNING, STOPPED} m_Status;   // system status
 	ConfReader cr;
+	MTFS mt;
 	vector<slavelist> slave_list;
 	vector<struct SlaveNode> activeSlaves;
 	bool listening;
 	vector<slaveJob> m_jobList;
 	queue<job> m_qmasterjobList;
-	vector<tableinfo> m_vtableInfo;
 	vector<ServerSocket> m_vsock;
 	vector<TCPInfo> m_vTCPInfo;
 private:
