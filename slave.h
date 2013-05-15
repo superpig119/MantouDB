@@ -17,6 +17,7 @@
 #include "simplesocket/SocketException.h"
 #include <dirent.h>
 #include <sys/stat.h>
+#include "MTFS.h"
 
 using namespace std;
 
@@ -103,6 +104,13 @@ typedef struct jobO
 	int portnum;
 }job;
 
+typedef struct CORRDINATE
+{
+	string attrname;
+	string p1;
+	string p2;
+}corrdinate;
+
 
 class Slave
 {
@@ -120,6 +128,7 @@ private:
 	ClientSocket m_client;
 public:
 	ConfReader cr;
+	MTFS mt;
 	long long m_llTotalMemUser;
 	long long m_llCurrMemUsed;
 	long long m_llCurrCPUUsed;
@@ -138,4 +147,5 @@ private:
 	static void* sendSysinfo(void* s);
 	static void* partition(void* s);
 	static void* test(void* s);
+	static void* readData(void *s);
 };

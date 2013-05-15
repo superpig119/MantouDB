@@ -40,9 +40,7 @@ void MTFS::dataSplit(void *s)
 	cout << "in datainit!!!" << endl;
 	stringstream ss;
 	string strx;
-	//vector<fileinfo>::iterator ivfileinfo;
 	vector<bigfile>::iterator ivbigfile;
-//	list<smallfile>::iterator ilsmallfile;
 	int c= 0;
 	while(1)
 	{
@@ -331,13 +329,13 @@ void MTFS::dataSplit(void *s)
 				fstream of;
 				of.open(fname.c_str(), ofstream::out | ofstream::app);
 				of << (*ivbigfile).fileinfo.size() << endl;
-				for(ifileinfo = (*ivbigfile).fileinfo.begin(); ifileinfo != (*ivbigfile).fileinfo.end(); ifileinfo++)
+	/*			for(ifileinfo = (*ivbigfile).fileinfo.begin(); ifileinfo != (*ivbigfile).fileinfo.end(); ifileinfo++)
 				{
 					of << (*ifileinfo).first << " " << (*ifileinfo).second << endl;
-				}
-				for(imsmallfile = (*ivbigfile).msmallfile.begin(); imsmallfile != (*ivbigfile).msmallfile.end(); imsmallfile++)
+				}*/
+				for(imsmallfile = (*ivbigfile).msmallfile.begin(), ifileinfo = (*ivbigfile).fileinfo.begin(); imsmallfile != (*ivbigfile).msmallfile.end(); imsmallfile++, ifileinfo++)
 				{
-					of << (*imsmallfile).first << endl;
+					of << (*imsmallfile).first << " " << (*ifileinfo).second << endl;
 					for(icontent = (*imsmallfile).second.begin(); icontent != (*imsmallfile).second.end(); icontent++)
 					{
 						of << *icontent << endl;
@@ -368,6 +366,8 @@ void MTFS::dataSplit(void *s)
 	        ofmeta << (*im_vtableInfo).dlist.size() << endl;//写入维数
 			ofmeta << self->activeSlaves.size() << endl;
 			vector<struct SlaveNode>::iterator iactiveSlaves;
+			int splitnum;
+			string ssplitnum;
 			for(iactiveSlaves = self->activeSlaves.begin(); iactiveSlaves != self->activeSlaves.end(); iactiveSlaves++)
 			{
 				tableslave ts;
@@ -381,11 +381,13 @@ void MTFS::dataSplit(void *s)
 			
 	        for(idindex = (*im_vtableInfo).dindex.begin(); idindex != (*im_vtableInfo).dindex.end(); idindex++)
 	        {
+				splitnum = 0;
 		        line = *idindex;
 				ss.clear();
 				ss << (*im_vtableInfo).dlist[*idindex].maptype;
 				ss >> stype;
 				line = line + " " + stype;
+				string contentline;
 		        switch((*im_vtableInfo).dlist[*idindex].maptype)
 		        {
 			        case 10:
@@ -397,6 +399,7 @@ void MTFS::dataSplit(void *s)
 				        string snum1, snum2;
 				        for(ivii = (*im_vtableInfo).dlist[*idindex].vii.begin(); ivii != (*im_vtableInfo).dlist[*idindex].vii.end(); ivii++)
 				        {
+							splitnum++;
 					        num1 = (*ivii).first;
 							ss.clear();
 					        ss << num1;
@@ -405,9 +408,12 @@ void MTFS::dataSplit(void *s)
 					        num2 = (*ivii).second;
 					        ss << num2;
 					        ss >> snum2;
-					        ss.clear();
-					        line = line + " " + snum1 + " " + snum2;
+					        contentline = contentline + " " + snum1 + " " + snum2;
 				        }
+					    ss.clear();
+						ss << splitnum;
+						ss >> ssplitnum;
+						line = line + " " + ssplitnum + " " + contentline;
 				        ofmeta << line << endl;
 				        break;
 			        }
@@ -419,6 +425,7 @@ void MTFS::dataSplit(void *s)
 				        string sfnum, sinum;
 				        for(ivfi = (*im_vtableInfo).dlist[*idindex].vfi.begin(); ivfi != (*im_vtableInfo).dlist[*idindex].vfi.end(); ivfi++)
 				        {
+							splitnum++;
 					        fnum = (*ivfi).first;
 							ss.clear();
 					        ss << fnum;
@@ -427,8 +434,12 @@ void MTFS::dataSplit(void *s)
 					        inum = (*ivfi).second;
 					        ss << inum;
 					        ss >> sinum;
-					        line = line + " " + sfnum + " " + sinum;
+					        contentline = contentline + " " + sfnum + " " + sinum;
 				        }
+					    ss.clear();
+						ss << splitnum;
+						ss >> ssplitnum;
+						line = line + " " + ssplitnum + " " + contentline;
 				        ofmeta << line << endl;
 				        break;
 			        }
@@ -439,12 +450,17 @@ void MTFS::dataSplit(void *s)
 				        string sinum;
 				        for(ivsi = (*im_vtableInfo).dlist[*idindex].vsi.begin(); ivsi != (*im_vtableInfo).dlist[*idindex].vsi.end(); ivsi++)
 				        {
+							splitnum++;
 					        inum = (*ivsi).second;
 							ss.clear();
 					        ss << inum;
 					        ss >> sinum;
-					        line = line + " " + (*ivsi).first + " " + sinum;
+					        contentline = contentline + " " + (*ivsi).first + " " + sinum;
 				        }
+					    ss.clear();
+						ss << splitnum;
+						ss >> ssplitnum;
+						line = line + " " + ssplitnum + " " + contentline;
 				        ofmeta << line << endl;
 				        break;
 			        }
@@ -506,6 +522,7 @@ void MTFS::MasterDataInit(void *s)
 			istringstream stream(line);
 			stream >> tablename;
 			stream >> stype;
+			stream >> mn.splitnum;
 			ss.clear();
 			ss << stype;
 			ss >> mn.maptype;
@@ -566,6 +583,66 @@ void MTFS::MasterDataInit(void *s)
 	}
 }
 
+void MTFS::SlaveDataInit()
+{
+	vector<string> filename;
+	trave_dir("./mantouDB/data/meta", filename);
+	
+	vector<string>::iterator ifilename;
+	vector<slavetableinfo>::iterator im_vtableInfo;
+	vector<slavemapnode>::iterator idlist;
+
+	stringstream ss;
+	int i, slavenum;
+	string line, word, stype;
+	for(ifilename = filename.begin(); ifilename != filename.end(); ifilename++)
+	{
+		slavetableinfo table;
+		ifstream ifile;
+		string path = "./mantouDB/data/meta/" + *ifilename;
+		string confname, snum;
+		int dnum, lnum;
+		ifile.open(path.c_str());
+		table.tableName = (*ifilename).substr(0, (*ifilename).find("."));
+		ifile >> confname;
+		ifile >> dnum;
+		table.confname = confname;
+        
+		ifile >> slavenum;
+		for(i = 0; i < slavenum; i++)
+		{
+			tableslave ts;
+			ifile >> ts.ip;
+			cout << ts.ip << endl;
+			ts.alive = false;
+			table.vtableslave.push_back(ts);
+		}
+
+		getline(ifile, line);
+		for(i = 0; i < dnum; i++)
+		{
+			int p2;
+			slavemapnode mn;
+			mn.p1 = 1;
+			getline(ifile, line);
+			istringstream stream(line);
+			stream >> mn.dname;
+			stream >> stype;
+			stream >> p2;
+			ss.clear();
+			ss << p2;
+			ss >> mn.p2;
+			ss.clear();
+			ss << stype;
+			ss >> mn.maptype;
+			mn.hasRelation = false;
+			table.dlist.push_back(mn);
+		}
+		m_vslavetableInfo.push_back(table);
+	}
+}
+
+
 int MTFS::trave_dir(char* path, vector<string> &filename)
 {
     DIR *d = opendir(path); //声明一个句柄
@@ -588,6 +665,169 @@ int MTFS::trave_dir(char* path, vector<string> &filename)
     closedir(d);
 	return 0;
 }
-void readData(void *s)
+
+
+void MTFS::readData(string tablename, vector<slavemapnode> &dlist)
 {
+	vector<string> filename;
+	vector<string>::iterator ifilename;
+	vector<slavemapnode>::iterator idlist;
+	string path = "./mantouDB/data/";
+	path += tablename;
+	char cpath[40];
+	strcpy(cpath, path.c_str());
+	trave_dir(cpath, filename);
+	
+	stringstream ss;
+	bool flag;
+	int count, num, n1 = 0, n2 = 0, ntmp;
+	string corrd, c, dtmp;
+	for(ifilename = filename.begin(); ifilename != filename.end(); ifilename++)
+	{
+		bigfile bf;
+		bf.d = (*ifilename).substr(tablename.size() + 1, (*ifilename).size() - tablename.size());
+	//	cout << bf.d << endl;
+		ifstream infile;
+		infile.open((path + "/" + *ifilename).c_str());
+//		cout << *ifilename << endl;
+		infile >> count;
+//		cout << "count" << count << endl;
+		while(count)
+		{
+			infile >> corrd >> num;
+			n1 = n2 = 0;
+			flag = true;
+		//	cout << corrd << endl;
+			n1 = corrd.find(".", n2 + 1);
+			for(idlist = dlist.begin(); idlist != dlist.end(); idlist++)
+			{
+				n2 = corrd.find(".", n1 + 1);
+				dtmp = corrd.substr(n1 + 1, n2 - n1 -1);
+				n1 = n2;
+			//	cout  << dtmp << endl;
+				ss.clear();
+				ss << dtmp;
+				ss >> ntmp;
+		//		cout << dtmp << " " << (*idlist).p1 << " " << (*idlist).p2 << endl;
+				if(ntmp < (*idlist).p1 || ntmp > (*idlist).p2)
+				{
+					flag = false;
+				//	cout << dtmp << " " << (*idlist).p1 << " " << (*idlist).p2 << endl;
+				//	cout << "out!" << endl;
+					count--;
+					while(num)
+					{
+						infile >> c;
+						num--;
+					}
+					break;
+				}
+	//			cout  << dtmp << endl;
+			}
+	//		cout << endl;
+			
+			if(!flag)
+				continue;
+	//		cout << corrd << endl;
+			list<string> content;
+			while(num)
+			{
+				flag = true;
+				infile >> c;
+				n1 = n2 = 0;
+				for(idlist = dlist.begin(); idlist != dlist.end(); idlist++)
+				{
+					//cout << c << endl;
+					n1 = c.find(",", n2);
+					if((*idlist).hasRelation)
+					{
+						cout << (*idlist).dname << " " << (*idlist).relation << " " << (*idlist).value << endl;
+
+						if((*idlist).relation == "=")
+						{	
+							dtmp = c.substr(n2, n1 - n2);
+							cout << dtmp << endl;
+							if(dtmp != (*idlist).value)
+							{
+								flag = false;
+								num--;
+								break;
+							}
+						}
+						else if((*idlist).relation == ">")
+						{	
+							dtmp = c.substr(n2, n1 - n2);
+							if(dtmp <= (*idlist).value)
+							{
+								flag = false;
+								num--;
+								break;
+							}
+						}
+						else if((*idlist).relation == ">=")
+						{	
+							dtmp = c.substr(n2, n1 - n2);
+							if(dtmp < (*idlist).value)
+							{
+								flag = false;
+								num--;
+								break;
+							}
+						}
+						else if((*idlist).relation == "<")
+						{	
+							dtmp = c.substr(n2, n1 - n2);
+							if(dtmp >= (*idlist).value)
+							{
+								flag = false;
+								num--;
+								break;
+							}
+						}
+						else if((*idlist).relation == "<=")
+						{	
+							dtmp = c.substr(n2, n1 - n2);
+							if(dtmp > (*idlist).value)
+							{
+								flag = false;
+								num--;
+								break;
+							}
+						}
+					}
+					n2 = n1 + 1;
+				}
+				if(num == 0)
+					break;
+				if(flag)
+				{
+					cout << c << endl;
+					content.push_back(c);
+				}
+				num--;
+			}
+			bf.msmallfile[corrd] = content;
+			count--;
+		}
+		vbigfile.push_back(bf);
+	}
+	cout << "read finsih" <<endl;
+	cout << vbigfile.size() << endl;
+	
 }
+	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

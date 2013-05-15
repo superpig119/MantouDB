@@ -2,7 +2,7 @@
 CXX=g++
 start_master:conf.o master.o start_master.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o user.o tcptransport.o ServerSocket.o Socket.o ClientSocket.o	MTFS.o
 	g++ -o start_master conf.o master.o start_master.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o user.o  tcptransport.o ServerSocket.o Socket.o MTFS.o -lpthread -g
-	g++ -o start_slave start_slave.cpp slave.cpp tcptransport.cpp conf.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o ClientSocket.o Socket.o -lpthread 
+	g++ -o start_slave start_slave.cpp slave.cpp tcptransport.cpp MTFS.o conf.o tinyxml.o tinystr.o tinyxmlerror.o tinyxmlparser.o ClientSocket.o Socket.o -lpthread 
 	mv *.o ./obj
 	g++ -o stop_all stop_all.cpp
 #SRC =  conf.cpp master.cpp start_master.cpp

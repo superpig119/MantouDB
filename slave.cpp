@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <fstream>
 #include <algorithm>
-#include "MTFS.h"
 
 using namespace std;
 
@@ -46,6 +45,19 @@ int Slave::init()
 	
 	m_Status = RUNNING;	
 
+	mt.SlaveDataInit();
+/*	vector<slavetableinfo>::iterator im_vtableInfo;
+	vector<slavemapnode>::iterator idlist;
+	for(im_vtableInfo = mt.m_vslavetableInfo.begin(); im_vtableInfo != mt.m_vslavetableInfo.end(); im_vtableInfo++)
+	{
+		cout << "tablename: " << (*im_vtableInfo).tableName << endl;
+		cout << "dnum: " << (*im_vtableInfo).dlist.size() << endl;
+		for(idlist = (*im_vtableInfo).dlist.begin(); idlist != (*im_vtableInfo).dlist.end(); idlist++)
+		{
+			cout << (*idlist).dname << " " << (*idlist).maptype << " " << (*idlist).splitnum << endl;
+		}
+	}
+*/
 	pthread_t getTaskFunc;
 	if(pthread_create(&getTaskFunc, NULL, getTask, this))
 		cout << "create thread error" << endl;
@@ -124,6 +136,15 @@ void *Slave::getTask(void *s)	//负责接收任务，将job插入到job队列中
 				self->m_jobList.push(j);
 				break;
 			}
+			case 5:
+			{
+				job j;
+				j.jobtype = 5;
+				j.j_Status = 0;
+				j.portnum = portnum;
+				self->m_jobList.push(j);
+				break;
+			}
 			default:
 				break;
 	
@@ -165,6 +186,15 @@ void* Slave::jobAssign(void* s)	//负责根据job列表来分派任务
 					pthread_create(&ptest, NULL, test, self);
 					void *exit = (int*)malloc(4);
 					pthread_join(ptest,&exit);
+					j.j_Status = 1;
+					break;
+				}
+				case 5:
+				{
+					pthread_t pread;
+					pthread_create(&pread, NULL, readData, self);
+					void *exit = (int*)malloc(4);
+					pthread_join(pread,&exit);
 					j.j_Status = 1;
 					break;
 				}
@@ -540,9 +570,90 @@ int Slave::trave_dir(char* path, vector<string> &filename)
     closedir(d);
     return 0;
 }
-/*
+
 void* Slave::readData(void *s)
 {
 	Slave *self = (Slave*)s;
+	ClientSocket client(self->masterAddress, self->m_jobList.front().portnum);
+	string srecvtime;
+	int recvtime;
+	stringstream ss;
+	client >> srecvtime;
+	client << "~~";
+	ss << srecvtime;
+	ss >> recvtime;
 	
-}*/
+	vector<corrdinate> vcorrd;
+	string scmd, scorrd, attrname;
+	vector<string> vcmd;
+	vector<string>::iterator ivcmd;
+	vector<string> corrd;
+	vector<string>::iterator icorrd;
+	vector<slavetableinfo>:: iterator im_vslavetableInfo;
+	vector<slavemapnode>::iterator idlist;
+	while(recvtime)
+	{
+		client >> scmd;
+		client << "~~";
+		cout << "slave:" << scmd << endl;
+		client >> scorrd;
+		cout << "slave:" << scorrd << endl;
+		client << "~~";
+		vcmd.push_back(scmd);
+		corrd.push_back(scorrd);
+		recvtime--;
+	}
+	
+	vector<slavemapnode> dlisttmp;
+	string tablename, command, relation, cat;
+	for(ivcmd = vcmd.begin(), icorrd = corrd.begin(); ivcmd != vcmd.end(); ivcmd++, icorrd++)
+	{
+		istringstream cmdstream(*ivcmd);
+		istringstream corrdstream(*icorrd);
+		cmdstream >> tablename;
+		cmdstream >> command;
+		corrdstream >> tablename;	
+		for(im_vslavetableInfo = self->mt.m_vslavetableInfo.begin(); im_vslavetableInfo != self->mt.m_vslavetableInfo.end(); im_vslavetableInfo++)
+		{
+			if((*im_vslavetableInfo).tableName == tablename)
+				break;
+		}
+		dlisttmp = (*im_vslavetableInfo).dlist;
+		while(corrdstream >> attrname)
+		{
+			for(idlist = dlisttmp.begin(); idlist != dlisttmp.end(); idlist++)
+			{
+				if(attrname == (*idlist).dname)
+					break;
+			}
+			corrdstream >> (*idlist).p1;	
+			corrdstream >> (*idlist).p2;	
+		}	
+		
+		do
+		{	cmdstream >> attrname;		
+			for(idlist = dlisttmp.begin(); idlist != dlisttmp.end(); idlist++)
+			{
+				if(attrname == (*idlist).dname)
+					break;
+			}
+
+			cmdstream >> (*idlist).relation;
+			cmdstream >> (*idlist).value;
+			if((*idlist).maptype == 30)
+			{
+				if((*idlist).value.find("\"") == string::npos)
+					(*idlist).value = "\"" + (*idlist).value + "\"";
+			}
+			(*idlist).hasRelation = true;
+		}while(cmdstream >> cat);
+		self->mt.readData(tablename, dlisttmp);
+	}
+
+	for(idlist = dlisttmp.begin(); idlist != dlisttmp.end(); idlist++)
+	{
+		cout << (*idlist).dname << " " << (*idlist).p1 << " " << (*idlist).p2 << endl;
+	}
+	
+	self->m_jobList.front().j_Status = 2;
+}

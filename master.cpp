@@ -60,7 +60,7 @@ int Master::init()
 					{
 						cout << (*ivii).first << " " << (*ivii).second << " ";
 					}
-					cout << endl;
+	//				cout << endl;
 					break;
 				}
 				case 20:
@@ -69,7 +69,7 @@ int Master::init()
 					{
 						cout << (*ivfi).first << " " << (*ivfi).second << " ";
 					}
-					cout << endl;
+	//				cout << endl;
 					break;
 				}
 				case 30:
@@ -78,12 +78,13 @@ int Master::init()
 					{
 						cout << (*ivsi).first << " " << (*ivsi).second << " ";
 					}
-					cout << endl;
+	//				cout << endl;
 					break;
 				}
 				default:
 					break;
 			}
+			cout << " " <<  (*idlist).second.splitnum << endl;
 		}
 	}
 
@@ -392,22 +393,20 @@ void* Master::jobDealer(void*s)
 					}
 					break;
 				}
-	/*			case 5:
+				case 5:
 				{
-					for(iTCPInfo = vTCPInfo.begin(); iTCPInfo != vTCPInfo.end(); iTCPInfo++)
-					{
-						cout <<  "in 5" << endl;
-						cout << (*iTCPInfo).server->m_sock << endl;
-						TCPInfo tinfo = *iTCPInfo;
-						pthread_t ptestget;
-						pthread_create(&ptestget, NULL, getdata, &tinfo);
-						void* exit = (int*)malloc(4);
+					cout << "in 5" << endl;
+					latertcptype ltt;
+					ltt.master = self;
+					ltt.vTCPInfo = vTCPInfo;
+					pthread_t ptestget;
+					pthread_create(&ptestget, NULL, getData, &ltt);
+					void* exit = (int*)malloc(4);
 					//	pthread_detach(pgetSysinfo);
-						pthread_join(ptest, &exit);		
-						sleep(1);
-					}
+					pthread_join(ptestget, &exit);		
+					sleep(1);
 					break;
-				}*/
+				}
 				default:
 					break;
 			}
@@ -1002,12 +1001,16 @@ void* Master::senddata(void* s)
 	sendfileinfo *self = (sendfileinfo*)s;
 	vector<string>::iterator ifilename;
 	string filepath = "../data/tmp/";
+	string cmd;
 	for(ifilename = self->filename.begin(); ifilename != self->filename.end(); ifilename++)
 	{
-		string cmd = (string("scp -P 13022 -r ") + filepath + (*ifilename) + " " + self->username + "@" + self->ip + ":" + self->base  + "/data/" + self->tablename +  "/" + *ifilename);
+		cmd = (string("scp -P 13022 -r ") + filepath + (*ifilename) + " " + self->username + "@" + self->ip + ":" + self->base  + "/data/" + self->tablename +  "/" + *ifilename);
 		system(cmd.c_str());
 		system(("rm " + filepath + (*ifilename)).c_str());
 	}
+	string confpath = "../data/meta/";
+	cmd = (string("scp -P 13022 -r ") + confpath + self->tablename + ".meta" + " " + self->username + "@" + self->ip + ":" + self->base  + "/data/meta/" + self->tablename + ".meta");
+	system(cmd.c_str());
 
 }
 
@@ -1033,22 +1036,25 @@ int Master::trave_dir(char* path, vector<string> &filename)
     closedir(d);
     return 0;
 }
-/*
-void Master::decode(vector<string> c)
+
+void Master::decode(vector<string> c, vector<tablecorrdinate> &vtablecorrdinate)	//将查询语句转化成查询坐标
 {
 	vector<string>::iterator ic;
-	vector<tableinfo>::iterator im_vtableInfo, im_vtableInfo2;
-	vector<pair<string, int> >::iterator ivsi;
-	vector<pair<int, int> >::iterator ivii;
-	vector<pair<float, int> >::iterator ivfi;
-	string tablename;
-	string attrname;
-	string relation;
-	string value;
-	for(ic = c.begin(); ic != c.end; ic++)
+	vector<tableinfo>::iterator im_vtableInfo;
+	vector<pair<string, int> >::iterator ivsi1, ivsi2;
+	vector<pair<int, int> >::iterator ivii1, ivii2;
+	vector<pair<float, int> >::iterator ivfi1, ivfi2;
+	string tablename, command, attrname, relation, value, connect;
+	int type, ivalue;
+	int p1, p2;		//坐标上下界
+	float fvalue;
+	stringstream ss;
+	for(ic = c.begin(); ic != c.end(); ic++)
 	{
-		istringstream stream(line);
+		tablecorrdinate tc;
+		istringstream stream(*ic);
 		stream >> tablename;
+		tc.tablename = tablename;
 		for(im_vtableInfo = mt.m_vtableInfo.begin(); im_vtableInfo != mt.m_vtableInfo.end(); im_vtableInfo++)
 		{
 			if(tablename == (*im_vtableInfo).tableName)
@@ -1059,43 +1065,364 @@ void Master::decode(vector<string> c)
 		if(im_vtableInfo == mt.m_vtableInfo.end())
 			cout << "no such table!" << endl;
 		
+		stream >> command;
 		do
 		{
+			corrdinate corrdset;
 			stream >> attrname;
 			stream >> relation;
 			stream >> value;
-		}while()
+			corrdset.attrname = attrname;
+			type = (*im_vtableInfo).dlist[attrname].maptype;
+			switch(type)
+			{
+				case 10:
+				case 11:
+				case 12:
+				{
+					ss.clear();
+					ss << value;
+					ss >> ivalue;
+					ivii1 = (*im_vtableInfo).dlist[attrname].vii.begin();
+					ivii2 = (*im_vtableInfo).dlist[attrname].vii.begin() + 1; 
+					while((*ivii1).first == (*ivii2).first)	//初始，让1和2指向不同的值 
+						ivii2++;
+					if(relation == "=")
+					{
+						while(1)
+						{
+							if(ivii2 == (*im_vtableInfo).dlist[attrname].vii.end())
+								break;
+							while(ivalue >= (*ivii2).first && (*ivii1).first == (*ivii2).first && ivii2 != (*im_vtableInfo).dlist[attrname].vii.end())
+							{
+								ivii2++;
+							}
+							if(ivalue > (*ivii2).first && (*ivii1).first != (*ivii2).first)
+							{
+								ivii1 = ivii2;
+								ivii2++;
+								continue;
+							}
+							if(ivalue < (*ivii2).first)
+							{
+								ivii2--;
+								break;
+							}
 
+						}
+					}
+					else if(relation == ">" || relation == ">=")
+					{
+						while(1)
+						{
+							while((*ivii2).first < ivalue)
+							{
+								ivii1 = ivii2;
+								while((*ivii1).first == (*ivii2).first && ivii2 != (*im_vtableInfo).dlist[attrname].vii.end())	//让1和2指向不同的值 
+									ivii2++;
+							}
+							if(ivii2 == (*im_vtableInfo).dlist[attrname].vii.end())	//返回的是最后一组
+								break;
+	
+							if((*ivii2).first == ivalue)
+							{
+								ivii1 = ivii2;
+							}
 
+							ivii2 = (*im_vtableInfo).dlist[attrname].vii.end();
+							break;
+						}
+					}
+					else if(relation == "<")
+					{
+						while((*ivii2).first < ivalue && ivii2 != (*im_vtableInfo).dlist[attrname].vii.end())
+						{
+							ivii2++;
+						}
+						ivii2--;
+					}
+					else if(relation == "<=")
+					{
+						while((*ivii2).first <= ivalue && ivii2 != (*im_vtableInfo).dlist[attrname].vii.end())
+						{
+							ivii2++;
+						}
+						ivii2--;
+					}
+					p1 = distance((*im_vtableInfo).dlist[attrname].vii.begin(), ivii1) + 1;
+					if(ivii2 == (*im_vtableInfo).dlist[attrname].vii.end())
+						ivii2 = ivii2 - 1;
+					p2 = distance((*im_vtableInfo).dlist[attrname].vii.begin(), ivii2) + 1;
+					ss.clear();
+					ss << p1;
+					ss >> corrdset.p1;
+					ss.clear();
+					ss << p2;
+					ss >> corrdset.p2;
+					break;
+				}
+				case 20:
+				{
+					ss.clear();
+					ss << value;
+					ss >> fvalue;
+					cout << fvalue<< endl;
+					ivfi1 = (*im_vtableInfo).dlist[attrname].vfi.begin();
+					ivfi2 = (*im_vtableInfo).dlist[attrname].vfi.begin() + 1;
+					while((*ivfi1).first == (*ivfi2).first)	//初始，让1和2指向不同的值 
+						ivfi2++;
+					if(relation == "=")
+					{
+						while(1)
+						{
+							if(ivfi2 == (*im_vtableInfo).dlist[attrname].vfi.end())
+								break;
+							if(fvalue >= (*ivfi2).first && (*ivfi1).first == (*ivfi2).first)
+							{
+								ivfi2++;
+								continue;
+							}
+							if(fvalue > (*ivfi2).first && (*ivfi1).first != (*ivfi2).first)
+							{
+								ivfi1 = ivfi2;
+								ivfi2++;
+								continue;
+							}
+							if(fvalue < (*ivfi2).first)
+							{
+								ivfi2--;
+								break;
+							}
+						}
+					}
+					else if(relation == ">" || relation == ">=")
+					{
+						while(1)
+						{
+							while((*ivfi2).first < fvalue)
+							{
+								ivfi1 = ivfi2;
+								while((*ivfi1).first == (*ivfi2).first && ivfi2 != (*im_vtableInfo).dlist[attrname].vfi.end())	//让1和2指向不同的值 
+									ivfi2++;
+							}
+							if(ivfi2 == (*im_vtableInfo).dlist[attrname].vfi.end())	//返回的是最后一组
+								break;
+	
+							if((*ivfi2).first == fvalue)
+							{
+								ivfi1 = ivfi2;
+							}
+
+							ivfi2 = (*im_vtableInfo).dlist[attrname].vfi.end();
+							break;
+						}
+					}
+					else if(relation == "<")
+					{
+						while((*ivfi2).first < fvalue && ivfi2 != (*im_vtableInfo).dlist[attrname].vfi.end())
+						{
+							cout << (*ivfi2).first << endl;
+							ivfi2++;
+						}
+						ivfi2--;
+					}
+					else if(relation == "<=")
+					{
+						while((*ivfi2).first <= fvalue && ivfi2 != (*im_vtableInfo).dlist[attrname].vfi.end())
+						{
+							cout << (*ivfi2).first << endl;
+							ivfi2++;
+						}
+						ivfi2--;
+					}
+					p1 = distance((*im_vtableInfo).dlist[attrname].vfi.begin(), ivfi1) + 1;
+					if(ivfi2 == (*im_vtableInfo).dlist[attrname].vfi.end())
+						ivfi2 = ivfi2 - 1;
+					p2 = distance((*im_vtableInfo).dlist[attrname].vfi.begin(), ivfi2) + 1;
+					ss.clear();
+					ss << p1;
+					ss >> corrdset.p1;
+					ss.clear();
+					ss << p2;
+					ss >> corrdset.p2;
+					break;
+				}
+				case 30:
+				{
+					ivsi1 = (*im_vtableInfo).dlist[attrname].vsi.begin();
+					ivsi2 = (*im_vtableInfo).dlist[attrname].vsi.begin() + 1;
+					while((*ivsi1).first == (*ivsi2).first)	//初始，让1和2指向不同的值 
+						ivsi2++;
+					value = "\"" + value +  "\"";
+					cout << "value " <<  value << endl;
+					if(relation == "=")
+					{
+						while((*ivsi2).first <= value)
+						{
+							if(ivsi2 + 1 == (*im_vtableInfo).dlist[attrname].vsi.end())
+								break;
+							ivsi1 = ivsi2;
+							while((*ivsi1).first == (*ivsi2).first && ivsi2 + 1 != (*im_vtableInfo).dlist[attrname].vsi.end())	//让1和2指向不同的值 
+								ivsi2++;
+						}
+						if((*ivsi2).first > value)
+							ivsi2--;
+					}
+					else if(relation == ">" || relation == ">=")
+					{
+						while(1)
+						{	
+							while((*ivsi2).first < value)
+							{
+								ivsi1 = ivsi2;
+								while((*ivsi1).first == (*ivsi2).first && ivsi2 != (*im_vtableInfo).dlist[attrname].vsi.end())	//让1和2指向不同的值 
+									ivsi2++;
+							}
+							if(ivsi2 == (*im_vtableInfo).dlist[attrname].vsi.end())	//返回的是最后一组
+								break;
+	
+							if((*ivsi2).first == value)
+							{
+								ivsi1 = ivsi2;
+							}
+
+							ivsi2 = (*im_vtableInfo).dlist[attrname].vsi.end();
+							break;
+						}
+					}
+					else if(relation == "<")
+					{
+						while((*ivsi2).first < value && ivsi2 != (*im_vtableInfo).dlist[attrname].vsi.end())
+						{
+							ivsi2++;
+						}
+						ivsi2--;
+					}
+					else if(relation == "<=")
+					{
+						while((*ivsi2).first <= value && ivsi2 != (*im_vtableInfo).dlist[attrname].vsi.end())
+						{
+							ivsi2++;
+						}
+						ivsi2--;
+					}
+					p1 = distance((*im_vtableInfo).dlist[attrname].vsi.begin(), ivsi1) + 1;
+					p1 = distance((*im_vtableInfo).dlist[attrname].vsi.begin(), ivsi1) + 1;
+					if(ivsi2 == (*im_vtableInfo).dlist[attrname].vsi.end())
+						ivsi2 = ivsi2 - 1;
+					p2 = distance((*im_vtableInfo).dlist[attrname].vsi.begin(), ivsi2) + 1;
+					ss.clear();
+					ss << p1;
+					ss >> corrdset.p1;
+					ss.clear();
+					ss << p2;
+					ss >> corrdset.p2;
+					break;
+				}
+				default:
+					break;
+			}
+//			cout << "p1:" << p1 << endl;
+//			cout << "p2:" << p2 << endl;
+			tc.vcorrdset.push_back(corrdset);
+		}while(stream >> connect);
+		vtablecorrdinate.push_back(tc);
 	}
 }
 
 void* Master::getData(void *s)
 {
-	TCPInfo* self = (TCPInfo*)s;
+	latertcptype* self = (latertcptype*)s;
+	Master* m = self->master;
+	vector<tablecorrdinate> vtablecorrdinate;
+	vector<tablecorrdinate>::iterator ivtablecorrdinate;
 	vector<string> c;
+	vector<corrdinate> vcorrdset;
+	vector<corrdinate>::iterator ivcorrdset;
+	string testcmd = "f get COUNTRY = IT and APPYEAR <= 1975 and BCKGLAG < 2 and FWDAPLAG > 15";
+	//string testcmd = "f get COUNTRY = US and APPYEAR <= 1975";
+	cout << testcmd << endl;
+	c.push_back(testcmd);
+	m->decode(c, vtablecorrdinate);
+	cout << "decode finish" << endl;
+	
+	vector<string> sendstr;
+	vector<string>::iterator isendstr;
+	for(ivtablecorrdinate = vtablecorrdinate.begin(); ivtablecorrdinate != vtablecorrdinate.end(); ivtablecorrdinate++)
+	{
+		string s = (*ivtablecorrdinate).tablename;
+		for(ivcorrdset = (*ivtablecorrdinate).vcorrdset.begin(); ivcorrdset != (*ivtablecorrdinate).vcorrdset.end(); ivcorrdset++)
+		{	
+			s += " " + (*ivcorrdset).attrname + 
+	" " + (*ivcorrdset).p1 + " " + (*ivcorrdset).p2;
+		}
+		sendstr.push_back(s);
+	}
+	
+	for(isendstr = sendstr.begin(); isendstr != sendstr.end(); isendstr++)
+		cout << *isendstr << endl;
 
-	c.push_back("f COUNTRY = GE and GYEAR > 1980");
+	vector<getRecordTcp> vgetRecordTcp;
+	vector<getRecordTcp>::iterator ivgetRecordTcp;
+	string tmp;
+	vector<TCPInfo>::iterator iTCPInfo;
+	for(iTCPInfo = self->vTCPInfo.begin(); iTCPInfo != self->vTCPInfo.end(); iTCPInfo++)
+	{
+		getRecordTcp grt;
+		grt.tcpinfo = *iTCPInfo;
+		grt.vscmd = c;
+		grt.vscorrd = sendstr;
+		grt.m = m;
+		vgetRecordTcp.push_back(grt);
+	}
+	
+	for(ivgetRecordTcp = vgetRecordTcp.begin(); ivgetRecordTcp != vgetRecordTcp.end(); ivgetRecordTcp++)
+	{
+		getRecordTcp grt = *ivgetRecordTcp;
+		pthread_t pslavegetrecord;
+		pthread_create(&pslavegetrecord, NULL, slaveGetRecord, &grt);
+		void* exit = (int*)malloc(4);
+		pthread_join(pslavegetrecord, &exit);		
+	}
+}
 
+void* Master::slaveGetRecord(void *s)
+{
+	getRecordTcp* self = (getRecordTcp*) s;
+	Master* m = self->m;
+	ServerSocket socket = *(self->tcpinfo).server;
+	cout << socket.m_sock<<endl;
+	int time = self->vscmd.size();
+	string stime;
+	stringstream ss;
+	ss.clear();
+	ss << time;
+	ss >> stime;
+	string tmp;
+	cout << "stime:" << stime << endl;
+	socket << stime;
+	socket >> tmp;
 
-	ServerSocket socket = *(self->server);
-	socket >> sysinfo; 
-	socket << "???";
-	socket >> s2; 
-	cout << "master " << self->ip << " sysinfo:" << sysinfo << endl;
+	vector<string>::iterator isendstr;
+	vector<string>::iterator ic;
+	for(ic = self->vscmd.begin(), isendstr = self->vscorrd.begin(); ic != self->vscmd.end(); ic++, isendstr++)
+	{
+		socket << *ic;
+	//	cout << "ic " << *ic << endl;
+		socket >> tmp;
+		socket << *isendstr;
+		socket >> tmp;
+	}
+
 	queue<job>* pslaveJob = (queue<job>*)malloc(16);
 	vector<slaveJob>::iterator ij;
-	::close((*(self->server)).m_sock);
-	::shutdown((*(self->server)).m_sock,2);
-	for(ij = self->m->m_jobList.begin(); ij != self->m->m_jobList.end(); ij++)
+	for(ij = self->m->m_jobList.begin(); ij != m->m_jobList.end(); ij++)
 	{
-		if((*ij).slave == self->ip)		//找到该slave的job队列
+		if((*ij).slave == self->tcpinfo.ip)		//找到该slave的job队列
 		{
 			pslaveJob = &(*ij).slaveJobList;
 			pslaveJob->front().j_Status = 3;
 			break;
 		}
 	}
-	free(pslaveJob);
 }
-*/
